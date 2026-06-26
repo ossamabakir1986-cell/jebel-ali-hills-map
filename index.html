@@ -59,7 +59,7 @@ background:#0949a7;
 
 <p>Jebel Ali Hills Mapping System</p>
 
-<a href="admin.html">
+<a href="#" onclick="openAdmin(); return false;">
 👑 Admin Map
 </a>
 
@@ -68,6 +68,16 @@ background:#0949a7;
 </a>
 
 </div>
+<script>
+function openAdmin() {
+    var password = prompt("Enter Admin Password:");
 
+    if (password === "BLACKshark") {
+        window.location.href = "admin.html";
+    } else if (password !== null) {
+        alert("Incorrect password");
+    }
+}
+</script>
 </body>
 </html>
