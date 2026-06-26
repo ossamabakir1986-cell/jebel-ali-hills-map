@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-imageoverlay-rotated/Leaflet.ImageOverlay.Rotated.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 html, body { height:100%; margin:0; font-family: Arial, sans-serif; }
 #map { height:100%; width:100%; }
@@ -104,6 +105,21 @@ button { background:#0b2f27; color:#d6a94a; font-weight:bold; cursor:pointer; }
     </select>
   </div>
   
+  <div class="row" data-admin="true"><button onclick="shiftOverlay(0,1)">↑ N</button><button onclick="shiftOverlay(0,-1)">↓ S</button><button onclick="shiftOverlay(-1,0)">← W</button><button onclick="shiftOverlay(1,0)">→ E</button></div>
+  <div class="row" data-admin="true"><button onclick="scaleOverlay(1.0005)">Scale +</button><button onclick="scaleOverlay(0.9995)">Scale -</button></div>
+  <div class="row" data-admin="true"><input id="opacitySlider" type="range" min="0" max="100" value="45" oninput="setOverlayOpacity(this.value)"></div>
+  <div class="row" data-admin="true"><button onclick="saveAlignment()">Save alignment in browser</button><button class="hideBtn" onclick="resetAlignment()">Reset alignment</button></div>
+  <div class="small-note" data-admin="true">Direct editing is saved only in this browser via localStorage. Use it to test shifts visually.</div>
+
+  <div class="row" data-admin="true">
+    <input id="excelUpload" type="file" accept=".xlsx,.xls" onchange="uploadExcelFile(event)">
+  </div>
+  <div class="row" data-admin="true">
+    <button onclick="exportAgentVersion()">Export Agent Version</button>
+  </div>
+  <div class="small-note" data-admin="true">Upload Excel updates this map in your browser. Export Agent Version creates a clean HTML without editing/upload tools.</div>
+
+
   <div class="row">
     <button onclick="applyFilters()">Apply</button>
     <button onclick="resetFilters()">Reset</button>
@@ -272,7 +288,205 @@ function resetFilters() {
   ["search","agent","color","type","phase","gfa","minSize","maxSize","minPrice","maxPrice","priced"].forEach(function(id) {
     document.getElementById(id).value = "";
   });
-  addMarkers(points);
+  
+function normalizeHeaderKey(k) {
+  return String(k || "").trim().toLowerCase();
+}
+function getCell(row, names) {
+  var map = {};
+  Object.keys(row).forEach(function(k){ map[normalizeHeaderKey(k)] = row[k]; });
+  for (var i=0; i<names.length; i++) {
+    var key = normalizeHeaderKey(names[i]);
+    if (map[key] !== undefined && map[key] !== null && String(map[key]).trim() !== "") return String(map[key]).trim();
+  }
+  return "";
+}
+function dmsToDecimalBrowser(dms) {
+  var m = String(dms || "").trim().match(/(\d+)°(\d+)'([\d.]+)"([NSEW])/);
+  if (!m) return null;
+  var val = Number(m[1]) + Number(m[2]) / 60 + Number(m[3]) / 3600;
+  if (m[4] === "S" || m[4] === "W") val = -val;
+  return val;
+}
+function parseCoordsBrowser(text) {
+  var m = String(text || "").match(/(\d+°\d+'[\d.]+"[NS])\s+(\d+°\d+'[\d.]+"[EW])/);
+  if (!m) return null;
+  return {lat: dmsToDecimalBrowser(m[1]), lon: dmsToDecimalBrowser(m[2])};
+}
+function asNumber(v) {
+  var s = String(v || "").replace(/,/g, "").trim();
+  if (!s) return null;
+  var n = Number(s);
+  return isNaN(n) ? null : n;
+}
+function fmtNumberBrowser(x) {
+  if (x === null || x === undefined || isNaN(x)) return "";
+  return Number(x).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function fmtPriceBrowser(x) {
+  if (x === null || x === undefined || isNaN(x)) return "";
+  return Math.round(Number(x)).toLocaleString();
+}
+function gfaPctBrowser(gfa) {
+  var g = String(gfa || "").toUpperCase().replace(/\s/g, "");
+  if (g.indexOf("G+4") !== -1) return 2.20;
+  if (g.indexOf("G+1") !== -1) return 0.65;
+  return null;
+}
+function colorTitle(s) {
+  s = String(s || "").trim();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
+}
+function pointFromExcelRow(row, idx) {
+  var gisPlot = getCell(row, ["GIS plot number", "plot number", "plot"]);
+  var masterPlot = getCell(row, ["Master Plan Plot", "master plan plot", "pa plot"]);
+  var coordsText = getCell(row, ["coordinates", "coordinate"]);
+  var coords = parseCoordsBrowser(coordsText);
+  if (!gisPlot || !coords) return null;
+
+  var size = asNumber(getCell(row, ["Size", "size"]));
+  var price = asNumber(getCell(row, ["price per sqrf", "price per sqft", "price/sqft", "price"]));
+  var secondPrice = asNumber(getCell(row, ["Second Price", "second price"]));
+
+  var total = (size !== null && price !== null) ? size * price : null;
+  var deposit = total !== null ? total * 0.10 : null;
+  var commission = total !== null ? total * 0.02 : null;
+
+  var secondTotal = (size !== null && secondPrice !== null) ? size * secondPrice : null;
+  var secondDeposit = secondTotal !== null ? secondTotal * 0.10 : null;
+  var secondCommission = secondTotal !== null ? secondTotal * 0.02 : null;
+
+  var gfa = getCell(row, ["GFA", "gfa"]);
+  var pct = gfaPctBrowser(gfa);
+  var gfaAllowed = (size !== null && pct !== null) ? size * pct : null;
+
+  var color = colorTitle(getCell(row, ["color"]));
+  var secondColor = colorTitle(getCell(row, ["second color"]));
+  var displayColor = color || secondColor || "Red";
+
+  return {
+    row: idx + 2,
+    gisPlot: String(gisPlot),
+    masterPlot: String(masterPlot || ""),
+    lat: coords.lat,
+    lon: coords.lon,
+    coords: coordsText,
+    mapsUrl: "https://www.google.com/maps?q=" + coords.lat + "," + coords.lon,
+    agent: getCell(row, ["agent name", "agent"]),
+    mobile: getCell(row, ["Mobile", "mobile"]),
+    size: size,
+    sizeText: size !== null ? fmtNumberBrowser(size) : "",
+    price: price,
+    priceText: fmtPriceBrowser(price),
+    total: total,
+    totalText: fmtPriceBrowser(total),
+    deposit: deposit,
+    depositText: fmtPriceBrowser(deposit),
+    commission: commission,
+    commissionText: fmtPriceBrowser(commission),
+    color: displayColor,
+    type: getCell(row, ["type"]),
+    phase: getCell(row, ["Phase", "phase"]),
+    gfa: gfa,
+    gfaPct: pct !== null ? Math.round(pct * 100) : null,
+    gfaAllowed: gfaAllowed,
+    gfaAllowedText: gfaAllowed !== null ? fmtNumberBrowser(gfaAllowed) : "",
+    secondAgent: getCell(row, ["second agent name", "second agent"]),
+    secondMobile: getCell(row, ["Second agent number", "second mobile", "second agent mobile"]),
+    secondPrice: secondPrice,
+    secondPriceText: fmtPriceBrowser(secondPrice),
+    secondTotal: secondTotal,
+    secondTotalText: fmtPriceBrowser(secondTotal),
+    secondDeposit: secondDeposit,
+    secondDepositText: fmtPriceBrowser(secondDeposit),
+    secondCommission: secondCommission,
+    secondCommissionText: fmtPriceBrowser(secondCommission),
+    secondColor: secondColor,
+    comment: getCell(row, ["comment", "comments", "note", "notes"])
+  };
+}
+function setSelectOptions(id, values, firstText) {
+  var sel = document.getElementById(id);
+  if (!sel) return;
+  var current = sel.value;
+  sel.innerHTML = '<option value="">' + firstText + '</option>' + values.map(function(v){
+    return '<option value="' + esc(v) + '">' + esc(v) + '</option>';
+  }).join('');
+  if (values.indexOf(current) !== -1) sel.value = current;
+}
+function refreshFilterOptionsFromPoints() {
+  var agents = [], colors = [], types = [], phases = [], gfas = [];
+  function add(arr, v){ if (v && arr.indexOf(v) === -1) arr.push(v); }
+  points.forEach(function(p){
+    add(agents, p.agent); add(agents, p.secondAgent);
+    add(colors, p.color); add(types, p.type); add(phases, p.phase); add(gfas, p.gfa);
+  });
+  agents.sort(); colors.sort(); types.sort(); phases.sort(); gfas.sort();
+  setSelectOptions("agent", agents, "All agents");
+  setSelectOptions("color", colors, "All statuses");
+  setSelectOptions("type", types, "All types");
+  setSelectOptions("phase", phases, "All phases");
+  setSelectOptions("gfa", gfas, "All GFA");
+}
+function uploadExcelFile(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = new Uint8Array(e.target.result);
+      var workbook = XLSX.read(data, {type: "array"});
+      var sheet = workbook.Sheets[workbook.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(sheet, {defval: ""});
+      var newPoints = [];
+      rows.forEach(function(row, idx) {
+        var p = pointFromExcelRow(row, idx);
+        if (p) newPoints.push(p);
+      });
+      if (!newPoints.length) {
+        alert("No valid rows found. Please check GIS plot number and coordinates.");
+        return;
+      }
+      points = newPoints;
+      refreshFilterOptionsFromPoints();
+      resetFilters();
+      alert("Excel loaded: " + points.length + " valid plots.");
+    } catch(err) {
+      alert("Could not read Excel file: " + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function exportAgentVersion() {
+  var doc = document.documentElement.cloneNode(true);
+
+  // Remove admin/editing controls.
+  doc.querySelectorAll('[data-admin="true"]').forEach(function(el){ el.remove(); });
+  var upload = doc.querySelector('#excelUpload');
+  if (upload) upload.remove();
+
+  var htmlText = "<!doctype html>\n" + doc.outerHTML;
+
+  // Freeze current point data inside exported file.
+  htmlText = htmlText.replace(/var points = \[[\s\S]*?\];\nvar colorHex =/, "var points = " + JSON.stringify(points) + ";\nvar colorHex =");
+
+  // Freeze current overlay alignment and prevent agent version from loading admin saved browser alignment.
+  htmlText = htmlText.replace(/var overlayCorners = JSON\.parse\(localStorage\.getItem\("JAH_overlay_corners_map10"\)[\s\S]*?JSON\.parse\(JSON\.stringify\(originalCorners\)\);/, 
+    "var overlayCorners = " + JSON.stringify(overlayCorners) + ";");
+
+  // Remove admin-only function bodies from being visible/usable, but harmless if left.
+  htmlText = htmlText.replace(/<title>Jebel Ali Hills Inventory Map<\/title>/, "<title>Jebel Ali Hills Agent Map</title>");
+
+  var blob = new Blob([htmlText], {type: "text/html;charset=utf-8"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "Jebel_Ali_Hills_AGENT_VERSION.html";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+addMarkers(points);
 }
 function offsetLatLng(pt, eastMeters, northMeters) {
   var lat = pt[0], lon = pt[1];
@@ -308,6 +522,204 @@ function resetAlignment() {
   localStorage.removeItem("JAH_overlay_corners_map10");
   makeOverlay();
 }
+
+function normalizeHeaderKey(k) {
+  return String(k || "").trim().toLowerCase();
+}
+function getCell(row, names) {
+  var map = {};
+  Object.keys(row).forEach(function(k){ map[normalizeHeaderKey(k)] = row[k]; });
+  for (var i=0; i<names.length; i++) {
+    var key = normalizeHeaderKey(names[i]);
+    if (map[key] !== undefined && map[key] !== null && String(map[key]).trim() !== "") return String(map[key]).trim();
+  }
+  return "";
+}
+function dmsToDecimalBrowser(dms) {
+  var m = String(dms || "").trim().match(/(\d+)°(\d+)'([\d.]+)"([NSEW])/);
+  if (!m) return null;
+  var val = Number(m[1]) + Number(m[2]) / 60 + Number(m[3]) / 3600;
+  if (m[4] === "S" || m[4] === "W") val = -val;
+  return val;
+}
+function parseCoordsBrowser(text) {
+  var m = String(text || "").match(/(\d+°\d+'[\d.]+"[NS])\s+(\d+°\d+'[\d.]+"[EW])/);
+  if (!m) return null;
+  return {lat: dmsToDecimalBrowser(m[1]), lon: dmsToDecimalBrowser(m[2])};
+}
+function asNumber(v) {
+  var s = String(v || "").replace(/,/g, "").trim();
+  if (!s) return null;
+  var n = Number(s);
+  return isNaN(n) ? null : n;
+}
+function fmtNumberBrowser(x) {
+  if (x === null || x === undefined || isNaN(x)) return "";
+  return Number(x).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function fmtPriceBrowser(x) {
+  if (x === null || x === undefined || isNaN(x)) return "";
+  return Math.round(Number(x)).toLocaleString();
+}
+function gfaPctBrowser(gfa) {
+  var g = String(gfa || "").toUpperCase().replace(/\s/g, "");
+  if (g.indexOf("G+4") !== -1) return 2.20;
+  if (g.indexOf("G+1") !== -1) return 0.65;
+  return null;
+}
+function colorTitle(s) {
+  s = String(s || "").trim();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
+}
+function pointFromExcelRow(row, idx) {
+  var gisPlot = getCell(row, ["GIS plot number", "plot number", "plot"]);
+  var masterPlot = getCell(row, ["Master Plan Plot", "master plan plot", "pa plot"]);
+  var coordsText = getCell(row, ["coordinates", "coordinate"]);
+  var coords = parseCoordsBrowser(coordsText);
+  if (!gisPlot || !coords) return null;
+
+  var size = asNumber(getCell(row, ["Size", "size"]));
+  var price = asNumber(getCell(row, ["price per sqrf", "price per sqft", "price/sqft", "price"]));
+  var secondPrice = asNumber(getCell(row, ["Second Price", "second price"]));
+
+  var total = (size !== null && price !== null) ? size * price : null;
+  var deposit = total !== null ? total * 0.10 : null;
+  var commission = total !== null ? total * 0.02 : null;
+
+  var secondTotal = (size !== null && secondPrice !== null) ? size * secondPrice : null;
+  var secondDeposit = secondTotal !== null ? secondTotal * 0.10 : null;
+  var secondCommission = secondTotal !== null ? secondTotal * 0.02 : null;
+
+  var gfa = getCell(row, ["GFA", "gfa"]);
+  var pct = gfaPctBrowser(gfa);
+  var gfaAllowed = (size !== null && pct !== null) ? size * pct : null;
+
+  var color = colorTitle(getCell(row, ["color"]));
+  var secondColor = colorTitle(getCell(row, ["second color"]));
+  var displayColor = color || secondColor || "Red";
+
+  return {
+    row: idx + 2,
+    gisPlot: String(gisPlot),
+    masterPlot: String(masterPlot || ""),
+    lat: coords.lat,
+    lon: coords.lon,
+    coords: coordsText,
+    mapsUrl: "https://www.google.com/maps?q=" + coords.lat + "," + coords.lon,
+    agent: getCell(row, ["agent name", "agent"]),
+    mobile: getCell(row, ["Mobile", "mobile"]),
+    size: size,
+    sizeText: size !== null ? fmtNumberBrowser(size) : "",
+    price: price,
+    priceText: fmtPriceBrowser(price),
+    total: total,
+    totalText: fmtPriceBrowser(total),
+    deposit: deposit,
+    depositText: fmtPriceBrowser(deposit),
+    commission: commission,
+    commissionText: fmtPriceBrowser(commission),
+    color: displayColor,
+    type: getCell(row, ["type"]),
+    phase: getCell(row, ["Phase", "phase"]),
+    gfa: gfa,
+    gfaPct: pct !== null ? Math.round(pct * 100) : null,
+    gfaAllowed: gfaAllowed,
+    gfaAllowedText: gfaAllowed !== null ? fmtNumberBrowser(gfaAllowed) : "",
+    secondAgent: getCell(row, ["second agent name", "second agent"]),
+    secondMobile: getCell(row, ["Second agent number", "second mobile", "second agent mobile"]),
+    secondPrice: secondPrice,
+    secondPriceText: fmtPriceBrowser(secondPrice),
+    secondTotal: secondTotal,
+    secondTotalText: fmtPriceBrowser(secondTotal),
+    secondDeposit: secondDeposit,
+    secondDepositText: fmtPriceBrowser(secondDeposit),
+    secondCommission: secondCommission,
+    secondCommissionText: fmtPriceBrowser(secondCommission),
+    secondColor: secondColor,
+    comment: getCell(row, ["comment", "comments", "note", "notes"])
+  };
+}
+function setSelectOptions(id, values, firstText) {
+  var sel = document.getElementById(id);
+  if (!sel) return;
+  var current = sel.value;
+  sel.innerHTML = '<option value="">' + firstText + '</option>' + values.map(function(v){
+    return '<option value="' + esc(v) + '">' + esc(v) + '</option>';
+  }).join('');
+  if (values.indexOf(current) !== -1) sel.value = current;
+}
+function refreshFilterOptionsFromPoints() {
+  var agents = [], colors = [], types = [], phases = [], gfas = [];
+  function add(arr, v){ if (v && arr.indexOf(v) === -1) arr.push(v); }
+  points.forEach(function(p){
+    add(agents, p.agent); add(agents, p.secondAgent);
+    add(colors, p.color); add(types, p.type); add(phases, p.phase); add(gfas, p.gfa);
+  });
+  agents.sort(); colors.sort(); types.sort(); phases.sort(); gfas.sort();
+  setSelectOptions("agent", agents, "All agents");
+  setSelectOptions("color", colors, "All statuses");
+  setSelectOptions("type", types, "All types");
+  setSelectOptions("phase", phases, "All phases");
+  setSelectOptions("gfa", gfas, "All GFA");
+}
+function uploadExcelFile(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = new Uint8Array(e.target.result);
+      var workbook = XLSX.read(data, {type: "array"});
+      var sheet = workbook.Sheets[workbook.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(sheet, {defval: ""});
+      var newPoints = [];
+      rows.forEach(function(row, idx) {
+        var p = pointFromExcelRow(row, idx);
+        if (p) newPoints.push(p);
+      });
+      if (!newPoints.length) {
+        alert("No valid rows found. Please check GIS plot number and coordinates.");
+        return;
+      }
+      points = newPoints;
+      refreshFilterOptionsFromPoints();
+      resetFilters();
+      alert("Excel loaded: " + points.length + " valid plots.");
+    } catch(err) {
+      alert("Could not read Excel file: " + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function exportAgentVersion() {
+  var doc = document.documentElement.cloneNode(true);
+
+  // Remove admin/editing controls.
+  doc.querySelectorAll('[data-admin="true"]').forEach(function(el){ el.remove(); });
+  var upload = doc.querySelector('#excelUpload');
+  if (upload) upload.remove();
+
+  var htmlText = "<!doctype html>\n" + doc.outerHTML;
+
+  // Freeze current point data inside exported file.
+  htmlText = htmlText.replace(/var points = \[[\s\S]*?\];\nvar colorHex =/, "var points = " + JSON.stringify(points) + ";\nvar colorHex =");
+
+  // Freeze current overlay alignment and prevent agent version from loading admin saved browser alignment.
+  htmlText = htmlText.replace(/var overlayCorners = JSON\.parse\(localStorage\.getItem\("JAH_overlay_corners_map10"\)[\s\S]*?JSON\.parse\(JSON\.stringify\(originalCorners\)\);/, 
+    "var overlayCorners = " + JSON.stringify(overlayCorners) + ";");
+
+  // Remove admin-only function bodies from being visible/usable, but harmless if left.
+  htmlText = htmlText.replace(/<title>Jebel Ali Hills Inventory Map<\/title>/, "<title>Jebel Ali Hills Agent Map</title>");
+
+  var blob = new Blob([htmlText], {type: "text/html;charset=utf-8"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "Jebel_Ali_Hills_AGENT_VERSION.html";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
 addMarkers(points);
 </script>
 </body>
