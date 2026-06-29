@@ -38,19 +38,61 @@ function setMasterPlanVisible(show){
 }
 function initMapLayerControls(){
   try{
+    var publishedLayers = (location.pathname.indexOf('agent') !== -1 && window.HAYAT_ACTIVE_PUBLISHED_SETTINGS && window.HAYAT_ACTIVE_PUBLISHED_SETTINGS.layerVisibility) ? window.HAYAT_ACTIVE_PUBLISHED_SETTINGS.layerVisibility : null;
     var saved = localStorage.getItem('JAH_inventory_visibility');
     if(saved) inventoryVisibility = Object.assign(inventoryVisibility, JSON.parse(saved));
+    if(publishedLayers && publishedLayers.inventoryVisibility){
+      inventoryVisibility = Object.assign(inventoryVisibility, publishedLayers.inventoryVisibility);
+    }
     ['Red','Blue','Pink','Other'].forEach(function(b){
       var id = b === 'Red' ? 'showRedInventory' : b === 'Blue' ? 'showBlueInventory' : b === 'Pink' ? 'showPinkInventory' : 'showOtherInventory';
       var el = document.getElementById(id); if(el) el.checked = inventoryVisibility[b] !== false;
     });
     var showMaster = localStorage.getItem('JAH_show_master_plan');
+    if(publishedLayers && typeof publishedLayers.showMasterPlan === 'boolean') showMaster = publishedLayers.showMasterPlan ? '1' : '0';
     if(showMaster === '0'){
       var mp = document.getElementById('toggleMasterPlan'); if(mp) mp.checked = false;
       setMasterPlanVisible(false);
+    } else {
+      var mp2 = document.getElementById('toggleMasterPlan'); if(mp2) mp2.checked = true;
+      setMasterPlanVisible(true);
+    }
+    if(publishedLayers && typeof publishedLayers.showNonInventoryPA === 'boolean'){
+      window.showNonInventoryPALabels = publishedLayers.showNonInventoryPA;
+      try{ localStorage.setItem('JAH_show_non_inventory_pa', publishedLayers.showNonInventoryPA ? '1':'0'); }catch(e){}
+      var pa = document.getElementById('showNonInventoryPA'); if(pa) pa.checked = publishedLayers.showNonInventoryPA;
     }
   }catch(e){}
 }
+window.getCurrentLayerSettings = function(){
+  var mp = document.getElementById('toggleMasterPlan');
+  var pa = document.getElementById('showNonInventoryPA');
+  return {
+    inventoryVisibility: Object.assign({}, inventoryVisibility),
+    showMasterPlan: mp ? !!mp.checked : true,
+    showNonInventoryPA: pa ? !!pa.checked : (window.showNonInventoryPALabels !== false)
+  };
+};
+window.applyPublishedLayerVisibility = function(layerSettings){
+  if(!layerSettings || typeof layerSettings !== 'object') return;
+  if(layerSettings.inventoryVisibility){
+    inventoryVisibility = Object.assign(inventoryVisibility, layerSettings.inventoryVisibility);
+    ['Red','Blue','Pink','Other'].forEach(function(b){
+      var id = b === 'Red' ? 'showRedInventory' : b === 'Blue' ? 'showBlueInventory' : b === 'Pink' ? 'showPinkInventory' : 'showOtherInventory';
+      var el = document.getElementById(id); if(el) el.checked = inventoryVisibility[b] !== false;
+    });
+  }
+  if(typeof layerSettings.showMasterPlan === 'boolean'){
+    var mp = document.getElementById('toggleMasterPlan'); if(mp) mp.checked = layerSettings.showMasterPlan;
+    setMasterPlanVisible(layerSettings.showMasterPlan);
+  }
+  if(typeof layerSettings.showNonInventoryPA === 'boolean'){
+    window.showNonInventoryPALabels = layerSettings.showNonInventoryPA;
+    var pa = document.getElementById('showNonInventoryPA'); if(pa) pa.checked = layerSettings.showNonInventoryPA;
+    if(typeof window.updatePALabelZoomStyles === 'function') window.updatePALabelZoomStyles();
+  }
+  addMarkers(baseFilteredList || points, false);
+};
 // === End map layer visibility controls ===
 
 

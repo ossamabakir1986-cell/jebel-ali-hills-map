@@ -28,6 +28,12 @@
     } else if (window.detailFields) {
       settings.detailFields = window.detailFields;
     }
+    if (typeof window.getCurrentLayerSettings === 'function') {
+      settings.layerVisibility = window.getCurrentLayerSettings();
+    }
+    if (typeof window.getCurrentOverlayCorners === 'function') {
+      settings.overlayCorners = window.getCurrentOverlayCorners();
+    }
     return settings;
   }
   function safeSettings(data){ return data && typeof data === 'object' ? data : {}; }
@@ -36,8 +42,14 @@
   }
   function setActiveSettings(settings){
     window.HAYAT_ACTIVE_PUBLISHED_SETTINGS = safeSettings(settings);
+    if (window.HAYAT_ACTIVE_PUBLISHED_SETTINGS.overlayCorners && typeof window.setOverlayCornersFromPublish === 'function') {
+      window.setOverlayCornersFromPublish(window.HAYAT_ACTIVE_PUBLISHED_SETTINGS.overlayCorners);
+    }
     if (typeof window.applyPublishedFieldVisibility === 'function') {
       window.applyPublishedFieldVisibility();
+    }
+    if (typeof window.applyPublishedLayerVisibility === 'function') {
+      window.applyPublishedLayerVisibility(window.HAYAT_ACTIVE_PUBLISHED_SETTINGS.layerVisibility || {});
     }
   }
 

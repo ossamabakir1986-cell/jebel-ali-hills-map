@@ -59,6 +59,8 @@ window.JAH_PA_LABELS = [{"t":"PA6_001","lat":24.90525458,"lng":54.96361748},{"t"
     try{
       var saved = localStorage.getItem('JAH_show_non_inventory_pa');
       if(saved === '0') window.showNonInventoryPALabels = false;
+      var publishedLayers = (window.HAYAT_ACTIVE_PUBLISHED_SETTINGS && window.HAYAT_ACTIVE_PUBLISHED_SETTINGS.layerVisibility) ? window.HAYAT_ACTIVE_PUBLISHED_SETTINGS.layerVisibility : null;
+      if(publishedLayers && typeof publishedLayers.showNonInventoryPA === 'boolean') window.showNonInventoryPALabels = publishedLayers.showNonInventoryPA;
       var chk = document.getElementById('showNonInventoryPA');
       if(chk) chk.checked = !!window.showNonInventoryPALabels;
     }catch(e){}

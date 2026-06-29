@@ -31,3 +31,14 @@ function makeOverlay() {
 }
 makeOverlay();
 
+window.getCurrentOverlayCorners = function(){
+  return JSON.parse(JSON.stringify(overlayCorners));
+};
+window.setOverlayCornersFromPublish = function(corners){
+  if(!corners || !corners.tl || !corners.tr || !corners.bl) return false;
+  overlayCorners = JSON.parse(JSON.stringify(corners));
+  try { localStorage.setItem("JAH_overlay_corners_map10", JSON.stringify(overlayCorners)); } catch(e) {}
+  makeOverlay();
+  return true;
+};
+
