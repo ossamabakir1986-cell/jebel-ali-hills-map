@@ -1,7 +1,9 @@
 (function(){
   var STORAGE_KEY = 'HAYAT_JAH_POINTS_V21';
   var UPDATED_KEY = 'HAYAT_JAH_POINTS_V21_UPDATED';
+  var SETTINGS_KEY = 'HAYAT_JAH_PUBLISHED_SETTINGS_V21';
   window.HAYAT_SYNC_KEY = STORAGE_KEY;
+  window.HAYAT_SYNC_SETTINGS_KEY = SETTINGS_KEY;
 
   function parseDate(v){
     if(!v) return 0;
@@ -19,17 +21,37 @@
     }
     return false;
   }
+  function getCurrentPublishSettings(){
+    var settings = {};
+    if (typeof window.getCurrentDetailFields === 'function') {
+      settings.detailFields = window.getCurrentDetailFields();
+    } else if (window.detailFields) {
+      settings.detailFields = window.detailFields;
+    }
+    return settings;
+  }
+  function safeSettings(data){ return data && typeof data === 'object' ? data : {}; }
+  function getLocalSettings(){
+    try { return safeSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch(e) { return {}; }
+  }
+  function setActiveSettings(settings){
+    window.HAYAT_ACTIVE_PUBLISHED_SETTINGS = safeSettings(settings);
+    if (typeof window.applyPublishedFieldVisibility === 'function') {
+      window.applyPublishedFieldVisibility();
+    }
+  }
+
   function getLocalPublished(){
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
       var data = JSON.parse(raw);
-      return safePoints(data) ? {points:data, updated:localStorage.getItem(UPDATED_KEY) || ''} : null;
+      return safePoints(data) ? {points:data, updated:localStorage.getItem(UPDATED_KEY) || '', settings:getLocalSettings()} : null;
     } catch(e) { return null; }
   }
   function getFilePublished(){
     if (safePoints(window.HAYAT_PUBLISHED_POINTS)) {
-      return {points:window.HAYAT_PUBLISHED_POINTS, updated:window.HAYAT_PUBLISHED_UPDATED || ''};
+      return {points:window.HAYAT_PUBLISHED_POINTS, updated:window.HAYAT_PUBLISHED_UPDATED || '', settings:safeSettings(window.HAYAT_PUBLISHED_SETTINGS)};
     }
     return null;
   }
@@ -44,10 +66,12 @@
       var ok = setPoints(chosen.points);
       window.HAYAT_ACTIVE_DATA_UPDATED = chosen.updated || '';
       window.HAYAT_ACTIVE_DATA_SOURCE = chosen === local ? 'browser publish' : 'published data file';
+      setActiveSettings(chosen.settings || {});
       return ok;
     }
     window.HAYAT_ACTIVE_DATA_SOURCE = 'built-in inventory';
     window.HAYAT_ACTIVE_DATA_UPDATED = '';
+    setActiveSettings({});
     return false;
   };
 
@@ -56,6 +80,7 @@
       var stamp = new Date().toISOString();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(window.points || []));
       localStorage.setItem(UPDATED_KEY, stamp);
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(getCurrentPublishSettings()));
       window.HAYAT_ACTIVE_DATA_SOURCE = 'browser publish';
       window.HAYAT_ACTIVE_DATA_UPDATED = stamp;
       if (typeof window.refreshSyncStatus === 'function') window.refreshSyncStatus();
@@ -69,17 +94,21 @@
   window.clearPublishedPoints = function(){
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(UPDATED_KEY);
+    localStorage.removeItem(SETTINGS_KEY);
     window.HAYAT_ACTIVE_DATA_SOURCE = 'built-in inventory';
     window.HAYAT_ACTIVE_DATA_UPDATED = '';
+    setActiveSettings({});
     if (typeof window.refreshSyncStatus === 'function') window.refreshSyncStatus();
   };
 
   window.downloadPublishedDataFile = function(){
     var stamp = new Date().toISOString();
     var json = JSON.stringify(window.points || []);
+    var settingsJson = JSON.stringify(getCurrentPublishSettings());
     var js = '// Hayat Luxury GIS published inventory data\n' +
       '// Generated: ' + stamp + '\n' +
       'window.HAYAT_PUBLISHED_UPDATED = ' + JSON.stringify(stamp) + ';\n' +
+      'window.HAYAT_PUBLISHED_SETTINGS = ' + settingsJson + ';\n' +
       'window.HAYAT_PUBLISHED_POINTS = ' + json + ';\n';
     var blob = new Blob([js], {type:'application/javascript;charset=utf-8'});
     var a = document.createElement('a');
@@ -102,7 +131,11 @@
         if(!m) throw new Error('Could not find HAYAT_PUBLISHED_POINTS in file.');
         var data = JSON.parse(m[1]);
         if(!safePoints(data)) throw new Error('The file does not contain valid plot data.');
+        var sm = txt.match(/window\.HAYAT_PUBLISHED_SETTINGS\s*=\s*([\s\S]*?);\s*window\.HAYAT_PUBLISHED_POINTS/m);
+        var importedSettings = sm ? safeSettings(JSON.parse(sm[1])) : {};
         window.points = data;
+        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(importedSettings)); } catch(e) {}
+        setActiveSettings(importedSettings);
         window.publishCurrentPoints();
         if(typeof refreshFilterOptionsFromPoints === 'function') refreshFilterOptionsFromPoints();
         if(typeof applyFilters === 'function') applyFilters();

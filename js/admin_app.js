@@ -77,24 +77,46 @@ var detailFieldDefaults = {
   type:true, phase:true, gfa:true, comment:true, coordinates:true
 };
 var detailFields = Object.assign({}, detailFieldDefaults);
+window.detailFields = detailFields;
+function collectDetailFieldsFromChecklist(){
+  document.querySelectorAll('#detailsChecklist input[data-field]').forEach(function(cb){
+    detailFields[cb.getAttribute('data-field')] = cb.checked && !cb.disabled;
+  });
+  window.detailFields = detailFields;
+  return Object.assign({}, detailFields);
+}
+window.getCurrentDetailFields = function(){ return collectDetailFieldsFromChecklist(); };
+function getPublishedDetailPermissions(){
+  var s = window.HAYAT_ACTIVE_PUBLISHED_SETTINGS || window.HAYAT_PUBLISHED_SETTINGS || {};
+  return (s && s.detailFields && typeof s.detailFields === 'object') ? s.detailFields : null;
+}
 function loadDetailFields(){
   try {
     var saved = localStorage.getItem(detailFieldsKey);
     if (saved) detailFields = Object.assign({}, detailFieldDefaults, JSON.parse(saved));
   } catch(e) {}
+  var published = (location.pathname.indexOf('agent') !== -1) ? getPublishedDetailPermissions() : null;
   document.querySelectorAll('#detailsChecklist input[data-field]').forEach(function(cb){
     var k = cb.getAttribute('data-field');
+    var blocked = published && published[k] === false;
+    if (blocked) detailFields[k] = false;
     cb.checked = detailFields[k] !== false;
+    cb.disabled = !!blocked;
+    if (cb.parentElement) cb.parentElement.style.opacity = blocked ? '0.45' : '1';
+    if (cb.parentElement) cb.parentElement.title = blocked ? 'Hidden by Admin permission' : '';
   });
+  window.detailFields = detailFields;
 }
 function isDetailVisible(k){ return detailFields[k] !== false; }
 function applyDetailChecklist(){
-  document.querySelectorAll('#detailsChecklist input[data-field]').forEach(function(cb){
-    detailFields[cb.getAttribute('data-field')] = cb.checked;
-  });
+  collectDetailFieldsFromChecklist();
   try { localStorage.setItem(detailFieldsKey, JSON.stringify(detailFields)); } catch(e) {}
   markers.forEach(function(obj){ obj.marker.bindPopup(popupHtml(obj.point)); });
 }
+window.applyPublishedFieldVisibility = function(){
+  loadDetailFields();
+  if (typeof markers !== 'undefined' && markers) markers.forEach(function(obj){ obj.marker.bindPopup(popupHtml(obj.point)); });
+};
 function copyToClipboardSilent(text, label){
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(text).catch(function(){ prompt(label || 'Copy:', text); });
