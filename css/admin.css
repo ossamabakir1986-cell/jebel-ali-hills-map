@@ -209,3 +209,38 @@ input:focus, select:focus { outline:2px solid rgba(206,163,80,.35); border-color
 
 .agent-workflow-box{border:1px solid rgba(206,163,80,.35);border-radius:10px;padding:10px;margin-bottom:12px;background:rgba(249,247,239,.72)}
 .agent-workflow-box .small-note{font-size:12px;line-height:1.35;color:#6d6658}
+
+
+/* === Admin Plot Editor === */
+.plot-edit-modal{position:fixed;inset:0;z-index:5000;background:rgba(16,33,29,.55);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;}
+.plot-edit-card{width:min(720px,96vw);max-height:92vh;overflow:auto;background:#F9F7EF;border:1px solid rgba(206,163,80,.65);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.45);padding:16px;color:#1E1C1B;}
+.plot-edit-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(16,33,29,.16);padding-bottom:10px;margin-bottom:12px;}
+.plot-edit-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:#8A6D31;font-weight:800;}
+.plot-edit-head h3{margin:3px 0 0;color:#10211D;font-size:20px;}
+.plot-edit-close{width:38px!important;height:38px!important;border-radius:50%!important;font-size:22px!important;line-height:1!important;padding:0!important;}
+.plot-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.plot-edit-grid label{font-size:11px;font-weight:800;color:#10211D;text-transform:uppercase;letter-spacing:.05em;display:flex;flex-direction:column;gap:5px;}
+.plot-edit-grid input,.plot-edit-grid select,.plot-edit-grid textarea{font-size:14px!important;text-transform:none!important;letter-spacing:normal!important;font-weight:500!important;background:#fffdfa!important;}
+.plot-edit-grid input:disabled{background:#ece8dc!important;color:#666!important;}
+.plot-edit-wide{grid-column:1/-1;}
+.plot-edit-summary{margin-top:10px;padding:9px;border-radius:10px;background:rgba(206,163,80,.12);font-size:12px;line-height:1.45;color:#332b1b;}
+.plot-edit-actions{display:flex;gap:8px;margin-top:12px;}
+.plot-edit-actions button{width:auto;min-width:130px;}
+.plot-edit-actions .danger{background:#9b1c1c!important;color:#fff!important;border-color:#9b1c1c!important;}
+.plot-edit-actions .secondary{background:#6d6757!important;color:#fff!important;}
+.admin-actions{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px dashed rgba(16,33,29,.2);}
+.admin-actions button{font-size:12px;padding:7px 8px;border-radius:8px;}
+.admin-actions .danger{background:#9b1c1c!important;color:#fff!important;border-color:#9b1c1c!important;}
+@media(max-width:600px){.plot-edit-grid{grid-template-columns:1fr}.plot-edit-actions{flex-direction:column}.plot-edit-actions button{width:100%;}.plot-edit-card{padding:12px;}}
+/* === End Admin Plot Editor === */
+
+/* Invisible click target for adding master-plan-only PA plots to inventory */
+.pa-add-hotspot span{display:block;width:34px;height:24px;border-radius:12px;background:rgba(255,255,255,0);cursor:pointer;}
+.pa-add-hotspot span:hover{background:rgba(212,175,55,.18);outline:1px solid rgba(212,175,55,.45);}
+
+
+/* v3.0.1: keep plot markers and labels behind the Leaflet popup */
+.leaflet-popup-pane{z-index:1200 !important;}
+.leaflet-tooltip-pane{z-index:640 !important;}
+.leaflet-popup{z-index:1201 !important;}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{position:relative;z-index:1202;}

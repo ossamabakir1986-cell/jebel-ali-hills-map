@@ -9,6 +9,7 @@
 <script src="https://unpkg.com/leaflet-imageoverlay-rotated/Leaflet.ImageOverlay.Rotated.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <link rel="stylesheet" href="css/admin.css"/>
 </head>
 <body>
@@ -101,7 +102,7 @@
   
   <div class="row" data-admin="true"><button onclick="shiftOverlay(0,1)">↑ N</button><button onclick="shiftOverlay(0,-1)">↓ S</button><button onclick="shiftOverlay(-1,0)">← W</button><button onclick="shiftOverlay(1,0)">→ E</button></div>
   <div class="row" data-admin="true"><button onclick="scaleOverlay(1.0005)">Scale +</button><button onclick="scaleOverlay(0.9995)">Scale -</button></div>
-  <div class="row" data-admin="true"><input id="opacitySlider" type="range" min="0" max="100" value="45" oninput="setOverlayOpacity(this.value)"></div>
+  <div class="row" data-admin="true"><input id="opacitySlider" type="range" min="0" max="100" value="70" oninput="setOverlayOpacity(this.value)"></div>
   <div class="row" data-admin="true"><button onclick="saveAlignment()">Save alignment in browser</button><button class="hideBtn" onclick="resetAlignment()">Reset alignment</button></div>
   <div class="small-note" data-admin="true">Direct editing is saved only in this browser via localStorage. Use it to test shifts visually.</div>
 
@@ -123,7 +124,9 @@
   <div class="section-title" data-admin="true">Sync Engine</div>
   <div class="agent-workflow-box" data-admin="true">
     <div class="row"><button onclick="publishCurrentPoints(); alert('Published to this browser. Refresh Agent map on the same device/domain.');">Publish to Agent Map</button></div>
+    <div class="row"><button onclick="exportWebsiteUpdatePackage()">Export Website Update ZIP</button></div>
     <div class="row"><button onclick="downloadPublishedDataFile()">Download Website Sync File</button></div>
+    <div class="row"><button onclick="downloadAdminInventoryDataFile()">Download Updated Admin Data File</button></div>
     <div class="row"><input type="file" accept=".js" onchange="importPublishedDataFile(event)"></div>
     <div id="syncStatus" class="small-note"></div>
     <div class="small-note">For public website/GitHub sync: replace <b>js/published_inventory_data.js</b> with the downloaded file, then refresh the Agent map.</div>
@@ -138,6 +141,64 @@
     <button class="hideBtn" onclick="hideFilters()">☐ Hide</button>
   </div>
   <div id="count" class="stats"></div>
+</div>
+
+
+<div id="plotEditModal" class="plot-edit-modal" style="display:none" data-admin="true">
+  <div class="plot-edit-card">
+    <div class="plot-edit-head">
+      <div>
+        <div class="plot-edit-kicker">Admin Plot Editor</div>
+        <h3 id="plotEditTitle">Edit Plot</h3>
+      </div>
+      <button type="button" class="plot-edit-close" onclick="closePlotEditor()">×</button>
+    </div>
+    <input type="hidden" id="editRowId">
+    <div class="plot-edit-grid">
+      <label>GIS Plot<input id="editGisPlot" disabled></label>
+      <label>Master Plan Plot<input id="editMasterPlot" disabled></label>
+      <label>Agent<input id="editAgent"></label>
+      <label>Mobile<input id="editMobile"></label>
+      <label>Price per sqft<input id="editPrice" type="number" step="1"></label>
+      <label>Status / Color
+        <select id="editColor">
+          <option value="Red">Red</option>
+          <option value="Blue">Blue</option>
+          <option value="Pink">Pink</option>
+          <option value="Black">Black</option>
+          <option value="Green">Green</option>
+          <option value="Yellow">Yellow</option>
+          <option value="Orange">Orange</option>
+          <option value="">Other / Blank</option>
+        </select>
+      </label>
+      <label>Type<input id="editType"></label>
+      <label>Phase<input id="editPhase"></label>
+      <label>Second Agent<input id="editSecondAgent"></label>
+      <label>Second Mobile<input id="editSecondMobile"></label>
+      <label>Second Price<input id="editSecondPrice" type="number" step="1"></label>
+      <label>Second Color
+        <select id="editSecondColor">
+          <option value=""></option>
+          <option value="Red">Red</option>
+          <option value="Blue">Blue</option>
+          <option value="Pink">Pink</option>
+          <option value="Black">Black</option>
+          <option value="Green">Green</option>
+          <option value="Yellow">Yellow</option>
+          <option value="Orange">Orange</option>
+        </select>
+      </label>
+      <label class="plot-edit-wide">Comment<textarea id="editComment" rows="3"></textarea></label>
+    </div>
+    <div id="plotEditSummary" class="plot-edit-summary"></div>
+    <div class="plot-edit-actions">
+      <button type="button" onclick="savePlotEdit()">Save Changes</button>
+      <button type="button" class="danger" onclick="deletePlotFromEditor()">Delete Plot</button>
+      <button type="button" class="secondary" onclick="closePlotEditor()">Cancel</button>
+    </div>
+    <div class="small-note">Changes are saved in this browser immediately. For GitHub, download the updated data/sync file and upload it to the repository.</div>
+  </div>
 </div>
 
 <script src="js/admin_map.js"></script>

@@ -26,6 +26,7 @@ function setInventoryColorVisible(bucket, show){
   inventoryVisibility[bucket] = !!show;
   try{ localStorage.setItem('JAH_inventory_visibility', JSON.stringify(inventoryVisibility)); }catch(e){}
   addMarkers(baseFilteredList || points, false);
+  if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
 }
 function setMasterPlanVisible(show){
   if(!masterPlanOverlay) return;
@@ -35,6 +36,7 @@ function setMasterPlanVisible(show){
     try{ if(map.hasLayer(masterPlanOverlay)) map.removeLayer(masterPlanOverlay); }catch(e){}
   }
   try{ localStorage.setItem('JAH_show_master_plan', show ? '1':'0'); }catch(e){}
+  if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
 }
 function initMapLayerControls(){
   try{
@@ -113,47 +115,83 @@ function val(id) { return document.getElementById(id).value.trim(); }
 function num(id) { var v = val(id); return v === "" ? null : parseFloat(v); }
 function esc(s) { return String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-var detailFieldsKey = (location.pathname.indexOf('agent') !== -1 ? 'hayatAgentDetailFields' : 'hayatAdminDetailFields');
+var detailFieldsKey = 'HAYAT_JAH_DETAIL_FIELDS_V21';
+var detailSettingsKey = (window.HAYAT_SYNC_SETTINGS_KEY || 'HAYAT_JAH_PUBLISHED_SETTINGS_V21');
+var legacyDetailFieldsKey = (location.pathname.indexOf('agent') !== -1 ? 'hayatAgentDetailFields' : 'hayatAdminDetailFields');
 var detailFieldDefaults = {
   masterPlot:true, agent:true, mobile:true, size:true, pricing:true, secondOffer:true,
   type:true, phase:true, gfa:true, comment:true, coordinates:true
 };
 var detailFields = Object.assign({}, detailFieldDefaults);
 window.detailFields = detailFields;
+function readJsonSafe(key){
+  try { var raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch(e) { return null; }
+}
+function getSharedDetailFields(){
+  var s = readJsonSafe(detailSettingsKey);
+  return (s && s.detailFields && typeof s.detailFields === 'object') ? s.detailFields : null;
+}
+function writeSharedDetailFields(fields){
+  try {
+    var s = readJsonSafe(detailSettingsKey) || {};
+    s.detailFields = Object.assign({}, fields);
+    s.settingsUpdated = new Date().toISOString();
+    localStorage.setItem(detailSettingsKey, JSON.stringify(s));
+    window.HAYAT_ACTIVE_PUBLISHED_SETTINGS = Object.assign({}, window.HAYAT_ACTIVE_PUBLISHED_SETTINGS || {}, s);
+  } catch(e) {}
+}
 function collectDetailFieldsFromChecklist(){
   document.querySelectorAll('#detailsChecklist input[data-field]').forEach(function(cb){
-    detailFields[cb.getAttribute('data-field')] = cb.checked && !cb.disabled;
+    // Do not ignore disabled checkboxes here; disabled agent fields still represent Admin visibility.
+    detailFields[cb.getAttribute('data-field')] = !!cb.checked;
   });
   window.detailFields = detailFields;
   return Object.assign({}, detailFields);
 }
 window.getCurrentDetailFields = function(){ return collectDetailFieldsFromChecklist(); };
 function getPublishedDetailPermissions(){
-  var s = window.HAYAT_ACTIVE_PUBLISHED_SETTINGS || window.HAYAT_PUBLISHED_SETTINGS || {};
+  // Prefer the active settings chosen by sync_core. Fall back to the file settings.
+  var active = window.HAYAT_ACTIVE_PUBLISHED_SETTINGS || {};
+  if (active && active.detailFields && typeof active.detailFields === 'object') return active.detailFields;
+  var s = window.HAYAT_PUBLISHED_SETTINGS || {};
   return (s && s.detailFields && typeof s.detailFields === 'object') ? s.detailFields : null;
 }
 function loadDetailFields(){
-  try {
-    var saved = localStorage.getItem(detailFieldsKey);
-    if (saved) detailFields = Object.assign({}, detailFieldDefaults, JSON.parse(saved));
-  } catch(e) {}
-  var published = (location.pathname.indexOf('agent') !== -1) ? getPublishedDetailPermissions() : null;
+  // Correct priority:
+  // defaults < published file < old legacy key < direct shared key < current shared settings.
+  // Legacy keys used to reset Agent/Admin to all checked, so they must NOT override current shared settings.
+  detailFields = Object.assign({}, detailFieldDefaults);
+  var published = getPublishedDetailPermissions();
+  if (published) detailFields = Object.assign({}, detailFields, published);
+  var legacy = readJsonSafe(legacyDetailFieldsKey);
+  if (legacy) detailFields = Object.assign({}, detailFields, legacy);
+  var direct = readJsonSafe(detailFieldsKey);
+  if (direct) detailFields = Object.assign({}, detailFields, direct);
+  var shared = getSharedDetailFields();
+  if (shared) detailFields = Object.assign({}, detailFields, shared);
+
   document.querySelectorAll('#detailsChecklist input[data-field]').forEach(function(cb){
     var k = cb.getAttribute('data-field');
-    var blocked = published && published[k] === false;
-    if (blocked) detailFields[k] = false;
     cb.checked = detailFields[k] !== false;
-    cb.disabled = !!blocked;
-    if (cb.parentElement) cb.parentElement.style.opacity = blocked ? '0.45' : '1';
-    if (cb.parentElement) cb.parentElement.title = blocked ? 'Hidden by Admin permission' : '';
+    cb.disabled = false;
+    cb.onchange = function(){ applyDetailChecklist(); };
+    if (cb.parentElement) cb.parentElement.style.opacity = '1';
+    if (cb.parentElement) cb.parentElement.title = '';
   });
   window.detailFields = detailFields;
+  return Object.assign({}, detailFields);
 }
+window.loadDetailFields = loadDetailFields;
 function isDetailVisible(k){ return detailFields[k] !== false; }
 function applyDetailChecklist(){
   collectDetailFieldsFromChecklist();
-  try { localStorage.setItem(detailFieldsKey, JSON.stringify(detailFields)); } catch(e) {}
-  markers.forEach(function(obj){ obj.marker.bindPopup(popupHtml(obj.point)); });
+  try {
+    localStorage.setItem(detailFieldsKey, JSON.stringify(detailFields));
+    localStorage.setItem(legacyDetailFieldsKey, JSON.stringify(detailFields));
+    writeSharedDetailFields(detailFields);
+  } catch(e) {}
+  if (typeof markers !== 'undefined' && markers) markers.forEach(function(obj){ obj.marker.bindPopup(popupHtml(obj.point)); });
+  if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
 }
 window.applyPublishedFieldVisibility = function(){
   loadDetailFields();
@@ -494,18 +532,42 @@ function scaleOverlay(factor) {
   makeOverlay();
 }
 function setOverlayOpacity(v) {
-  if (masterPlanOverlay) masterPlanOverlay.setOpacity(Number(v)/100);
+  var n = Number(v);
+  if(isNaN(n) || n < 0 || n > 100) return;
+  if (typeof overlayOpacity !== 'undefined') overlayOpacity = n;
+  try { localStorage.setItem("JAH_overlay_opacity_map10", String(n)); } catch(e) {}
+  if (masterPlanOverlay) masterPlanOverlay.setOpacity(n/100);
+  if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
 }
 function saveAlignment() {
   localStorage.setItem("JAH_overlay_corners_map10", JSON.stringify(overlayCorners));
+  if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
   alert("Alignment saved in this browser.");
 }
 function resetAlignment() {
   overlayCorners = JSON.parse(JSON.stringify(originalCorners));
   localStorage.removeItem("JAH_overlay_corners_map10");
   makeOverlay();
+  if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
 }
 initMapLayerControls();
 addMarkers(points);
+
+
+// Robust delegated details checklist save. This keeps Admin and Agent settings persistent across refreshes.
+setTimeout(function(){
+  var box = document.getElementById('detailsChecklist');
+  if (box && !box.__hayatDetailsBound) {
+    box.__hayatDetailsBound = true;
+    box.addEventListener('change', function(e){
+      if (e.target && e.target.matches && e.target.matches('input[data-field]')) applyDetailChecklist();
+    }, true);
+  }
+}, 0);
+
+// Re-apply details after all other initializers finish, so defaults cannot override saved settings.
+setTimeout(function(){ if (typeof loadDetailFields === 'function') loadDetailFields(); }, 50);
+setTimeout(function(){ if (typeof loadDetailFields === 'function') loadDetailFields(); }, 400);
+window.addEventListener('pageshow', function(){ if (typeof loadDetailFields === 'function') loadDetailFields(); });
 
 setTimeout(function(){ if (window.HayatDataNormalize) { window.HayatDataNormalize.normalizeAllPoints(); if (typeof refreshFilterOptionsFromPoints === 'function') refreshFilterOptionsFromPoints(); if (typeof applyFilters === 'function') applyFilters(); } }, 0);

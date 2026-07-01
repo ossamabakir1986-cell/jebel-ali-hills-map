@@ -34,16 +34,26 @@
     if (typeof window.getCurrentOverlayCorners === 'function') {
       settings.overlayCorners = window.getCurrentOverlayCorners();
     }
+    if (typeof window.getCurrentOverlayOpacity === 'function') {
+      settings.overlayOpacity = window.getCurrentOverlayOpacity();
+    }
     return settings;
   }
   function safeSettings(data){ return data && typeof data === 'object' ? data : {}; }
   function getLocalSettings(){
     try { return safeSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch(e) { return {}; }
   }
+  function hasSettings(settings){
+    return settings && typeof settings === 'object' && Object.keys(settings).length > 0;
+  }
   function setActiveSettings(settings){
+    window.HAYAT_APPLYING_SETTINGS = true;
     window.HAYAT_ACTIVE_PUBLISHED_SETTINGS = safeSettings(settings);
     if (window.HAYAT_ACTIVE_PUBLISHED_SETTINGS.overlayCorners && typeof window.setOverlayCornersFromPublish === 'function') {
       window.setOverlayCornersFromPublish(window.HAYAT_ACTIVE_PUBLISHED_SETTINGS.overlayCorners);
+    }
+    if (typeof window.HAYAT_ACTIVE_PUBLISHED_SETTINGS.overlayOpacity !== 'undefined' && typeof window.setOverlayOpacityFromPublish === 'function') {
+      window.setOverlayOpacityFromPublish(window.HAYAT_ACTIVE_PUBLISHED_SETTINGS.overlayOpacity);
     }
     if (typeof window.applyPublishedFieldVisibility === 'function') {
       window.applyPublishedFieldVisibility();
@@ -51,7 +61,21 @@
     if (typeof window.applyPublishedLayerVisibility === 'function') {
       window.applyPublishedLayerVisibility(window.HAYAT_ACTIVE_PUBLISHED_SETTINGS.layerVisibility || {});
     }
+    window.HAYAT_APPLYING_SETTINGS = false;
   }
+
+  window.saveCurrentPublishSettings = function(){
+    try {
+      var settings = getCurrentPublishSettings();
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      window.HAYAT_ACTIVE_PUBLISHED_SETTINGS = safeSettings(settings);
+      if (typeof window.refreshSyncStatus === 'function') window.refreshSyncStatus();
+      return true;
+    } catch(e) {
+      console.warn('Could not save publish settings', e);
+      return false;
+    }
+  };
 
   function getLocalPublished(){
     try {
@@ -74,16 +98,17 @@
     var chosen = null;
     if (local && file) chosen = parseDate(local.updated) >= parseDate(file.updated) ? local : file;
     else chosen = local || file;
+    var localSettings = getLocalSettings();
     if (chosen) {
       var ok = setPoints(chosen.points);
       window.HAYAT_ACTIVE_DATA_UPDATED = chosen.updated || '';
       window.HAYAT_ACTIVE_DATA_SOURCE = chosen === local ? 'browser publish' : 'published data file';
-      setActiveSettings(chosen.settings || {});
+      setActiveSettings(hasSettings(localSettings) ? localSettings : (chosen.settings || {}));
       return ok;
     }
     window.HAYAT_ACTIVE_DATA_SOURCE = 'built-in inventory';
     window.HAYAT_ACTIVE_DATA_UPDATED = '';
-    setActiveSettings({});
+    setActiveSettings(hasSettings(localSettings) ? localSettings : {});
     return false;
   };
 
@@ -113,15 +138,18 @@
     if (typeof window.refreshSyncStatus === 'function') window.refreshSyncStatus();
   };
 
-  window.downloadPublishedDataFile = function(){
+  window.generatePublishedDataJS = function(){
     var stamp = new Date().toISOString();
     var json = JSON.stringify(window.points || []);
     var settingsJson = JSON.stringify(getCurrentPublishSettings());
-    var js = '// Hayat Luxury GIS published inventory data\n' +
+    return '// Hayat Luxury GIS published inventory data\n' +
       '// Generated: ' + stamp + '\n' +
       'window.HAYAT_PUBLISHED_UPDATED = ' + JSON.stringify(stamp) + ';\n' +
       'window.HAYAT_PUBLISHED_SETTINGS = ' + settingsJson + ';\n' +
       'window.HAYAT_PUBLISHED_POINTS = ' + json + ';\n';
+  };
+  window.downloadPublishedDataFile = function(){
+    var js = window.generatePublishedDataJS();
     var blob = new Blob([js], {type:'application/javascript;charset=utf-8'});
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -130,6 +158,34 @@
     a.click();
     setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
     window.publishCurrentPoints();
+  };
+
+  window.exportWebsiteUpdatePackage = async function(){
+    try {
+      var adminJS = (typeof window.generateAdminInventoryDataJS === 'function') ? window.generateAdminInventoryDataJS() : ('// Hayat Luxury GIS Admin inventory data\nvar points = ' + JSON.stringify(window.points || []) + ';\n');
+      var publishedJS = (typeof window.generatePublishedDataJS === 'function') ? window.generatePublishedDataJS() : '';
+      window.publishCurrentPoints();
+      if (!window.JSZip) {
+        alert('ZIP generator is not loaded. The two data files will download separately instead.');
+        if (typeof window.downloadAdminInventoryDataFile === 'function') window.downloadAdminInventoryDataFile();
+        window.downloadPublishedDataFile();
+        return;
+      }
+      var zip = new JSZip();
+      zip.file('js/admin_inventory_data.js', adminJS);
+      zip.file('js/published_inventory_data.js', publishedJS);
+      zip.file('README_WEBSITE_UPDATE.txt', 'Upload the files inside this ZIP to the same paths in GitHub.\n\nReplace:\n- js/admin_inventory_data.js\n- js/published_inventory_data.js\n\nAfter committing, wait 2-5 minutes for GitHub Pages and refresh Admin/Agent.\n');
+      var blob = await zip.generateAsync({type:'blob'});
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'hayat_gis_website_update.zip';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      alert('Website update ZIP created. Upload its contents to GitHub when you are ready.');
+    } catch(e) {
+      alert('Could not create website update package: ' + e.message);
+    }
   };
 
   window.importPublishedDataFile = function(event){

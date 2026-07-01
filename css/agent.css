@@ -206,3 +206,10 @@ input:focus, select:focus { outline:2px solid rgba(206,163,80,.35); border-color
 
 /* === End Smart Master Plan stealth PA labels === */
 
+
+
+/* v3.0.1: keep plot markers and labels behind the Leaflet popup */
+.leaflet-popup-pane{z-index:1200 !important;}
+.leaflet-tooltip-pane{z-index:640 !important;}
+.leaflet-popup{z-index:1201 !important;}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{position:relative;z-index:1202;}

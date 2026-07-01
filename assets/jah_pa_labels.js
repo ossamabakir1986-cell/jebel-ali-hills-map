@@ -52,6 +52,7 @@ window.JAH_PA_LABELS = [{"t":"PA6_001","lat":24.90525458,"lng":54.96361748},{"t"
     window.showNonInventoryPALabels = !!show;
     try{ localStorage.setItem('JAH_show_non_inventory_pa', window.showNonInventoryPALabels ? '1':'0'); }catch(e){}
     applyZoomStyle();
+    if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
   };
 
   window.addCrispMasterPlanLabels = function(){

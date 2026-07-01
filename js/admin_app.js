@@ -26,6 +26,7 @@ function setInventoryColorVisible(bucket, show){
   inventoryVisibility[bucket] = !!show;
   try{ localStorage.setItem('JAH_inventory_visibility', JSON.stringify(inventoryVisibility)); }catch(e){}
   addMarkers(baseFilteredList || points, false);
+  if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
 }
 function setMasterPlanVisible(show){
   if(!masterPlanOverlay) return;
@@ -35,6 +36,7 @@ function setMasterPlanVisible(show){
     try{ if(map.hasLayer(masterPlanOverlay)) map.removeLayer(masterPlanOverlay); }catch(e){}
   }
   try{ localStorage.setItem('JAH_show_master_plan', show ? '1':'0'); }catch(e){}
+  if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
 }
 function initMapLayerControls(){
   try{
@@ -113,47 +115,83 @@ function val(id) { return document.getElementById(id).value.trim(); }
 function num(id) { var v = val(id); return v === "" ? null : parseFloat(v); }
 function esc(s) { return String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-var detailFieldsKey = (location.pathname.indexOf('agent') !== -1 ? 'hayatAgentDetailFields' : 'hayatAdminDetailFields');
+var detailFieldsKey = 'HAYAT_JAH_DETAIL_FIELDS_V21';
+var detailSettingsKey = (window.HAYAT_SYNC_SETTINGS_KEY || 'HAYAT_JAH_PUBLISHED_SETTINGS_V21');
+var legacyDetailFieldsKey = (location.pathname.indexOf('agent') !== -1 ? 'hayatAgentDetailFields' : 'hayatAdminDetailFields');
 var detailFieldDefaults = {
   masterPlot:true, agent:true, mobile:true, size:true, pricing:true, secondOffer:true,
   type:true, phase:true, gfa:true, comment:true, coordinates:true
 };
 var detailFields = Object.assign({}, detailFieldDefaults);
 window.detailFields = detailFields;
+function readJsonSafe(key){
+  try { var raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch(e) { return null; }
+}
+function getSharedDetailFields(){
+  var s = readJsonSafe(detailSettingsKey);
+  return (s && s.detailFields && typeof s.detailFields === 'object') ? s.detailFields : null;
+}
+function writeSharedDetailFields(fields){
+  try {
+    var s = readJsonSafe(detailSettingsKey) || {};
+    s.detailFields = Object.assign({}, fields);
+    s.settingsUpdated = new Date().toISOString();
+    localStorage.setItem(detailSettingsKey, JSON.stringify(s));
+    window.HAYAT_ACTIVE_PUBLISHED_SETTINGS = Object.assign({}, window.HAYAT_ACTIVE_PUBLISHED_SETTINGS || {}, s);
+  } catch(e) {}
+}
 function collectDetailFieldsFromChecklist(){
   document.querySelectorAll('#detailsChecklist input[data-field]').forEach(function(cb){
-    detailFields[cb.getAttribute('data-field')] = cb.checked && !cb.disabled;
+    // Do not ignore disabled checkboxes here; disabled agent fields still represent Admin visibility.
+    detailFields[cb.getAttribute('data-field')] = !!cb.checked;
   });
   window.detailFields = detailFields;
   return Object.assign({}, detailFields);
 }
 window.getCurrentDetailFields = function(){ return collectDetailFieldsFromChecklist(); };
 function getPublishedDetailPermissions(){
-  var s = window.HAYAT_ACTIVE_PUBLISHED_SETTINGS || window.HAYAT_PUBLISHED_SETTINGS || {};
+  // Prefer the active settings chosen by sync_core. Fall back to the file settings.
+  var active = window.HAYAT_ACTIVE_PUBLISHED_SETTINGS || {};
+  if (active && active.detailFields && typeof active.detailFields === 'object') return active.detailFields;
+  var s = window.HAYAT_PUBLISHED_SETTINGS || {};
   return (s && s.detailFields && typeof s.detailFields === 'object') ? s.detailFields : null;
 }
 function loadDetailFields(){
-  try {
-    var saved = localStorage.getItem(detailFieldsKey);
-    if (saved) detailFields = Object.assign({}, detailFieldDefaults, JSON.parse(saved));
-  } catch(e) {}
-  var published = (location.pathname.indexOf('agent') !== -1) ? getPublishedDetailPermissions() : null;
+  // Correct priority:
+  // defaults < published file < old legacy key < direct shared key < current shared settings.
+  // Legacy keys used to reset Agent/Admin to all checked, so they must NOT override current shared settings.
+  detailFields = Object.assign({}, detailFieldDefaults);
+  var published = getPublishedDetailPermissions();
+  if (published) detailFields = Object.assign({}, detailFields, published);
+  var legacy = readJsonSafe(legacyDetailFieldsKey);
+  if (legacy) detailFields = Object.assign({}, detailFields, legacy);
+  var direct = readJsonSafe(detailFieldsKey);
+  if (direct) detailFields = Object.assign({}, detailFields, direct);
+  var shared = getSharedDetailFields();
+  if (shared) detailFields = Object.assign({}, detailFields, shared);
+
   document.querySelectorAll('#detailsChecklist input[data-field]').forEach(function(cb){
     var k = cb.getAttribute('data-field');
-    var blocked = published && published[k] === false;
-    if (blocked) detailFields[k] = false;
     cb.checked = detailFields[k] !== false;
-    cb.disabled = !!blocked;
-    if (cb.parentElement) cb.parentElement.style.opacity = blocked ? '0.45' : '1';
-    if (cb.parentElement) cb.parentElement.title = blocked ? 'Hidden by Admin permission' : '';
+    cb.disabled = false;
+    cb.onchange = function(){ applyDetailChecklist(); };
+    if (cb.parentElement) cb.parentElement.style.opacity = '1';
+    if (cb.parentElement) cb.parentElement.title = '';
   });
   window.detailFields = detailFields;
+  return Object.assign({}, detailFields);
 }
+window.loadDetailFields = loadDetailFields;
 function isDetailVisible(k){ return detailFields[k] !== false; }
 function applyDetailChecklist(){
   collectDetailFieldsFromChecklist();
-  try { localStorage.setItem(detailFieldsKey, JSON.stringify(detailFields)); } catch(e) {}
-  markers.forEach(function(obj){ obj.marker.bindPopup(popupHtml(obj.point)); });
+  try {
+    localStorage.setItem(detailFieldsKey, JSON.stringify(detailFields));
+    localStorage.setItem(legacyDetailFieldsKey, JSON.stringify(detailFields));
+    writeSharedDetailFields(detailFields);
+  } catch(e) {}
+  if (typeof markers !== 'undefined' && markers) markers.forEach(function(obj){ obj.marker.bindPopup(popupHtml(obj.point)); });
+  if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
 }
 window.applyPublishedFieldVisibility = function(){
   loadDetailFields();
@@ -398,15 +436,25 @@ function labelClass(color) {
   if (["red","pink","blue","black","green","yellow","orange"].includes(c)) return "lbl lbl-" + c;
   return "lbl lbl-default";
 }
+function ensureInventoryPane(){
+  try{
+    if(!map.getPane('inventoryPane')){
+      map.createPane('inventoryPane');
+      map.getPane('inventoryPane').style.zIndex = 620;
+      map.getPane('inventoryPane').style.pointerEvents = 'auto';
+    }
+  }catch(e){}
+}
 function addMarkers(list, doFit=true) {
   markers.forEach(function(obj) { map.removeLayer(obj.marker); });
   markers = [];
   var bounds = [];
+  ensureInventoryPane();
   list = (list || []).filter(function(p){ return isInventoryColorVisible(p.color); });
   list.forEach(function(p) {
     var c = colorHex[p.color] || "#666";
     var marker = L.circleMarker([p.lat, p.lon], {
-      radius: 7, color:"#fff", weight:1.5, fillColor:c, fillOpacity:.92
+      radius: 7, color:"#fff", weight:1.5, fillColor:c, fillOpacity:.92, pane:'inventoryPane'
     }).addTo(map);
     marker.bindTooltip(labelText(p), {permanent:true, direction:"top", className:labelClass(p.color), offset:[0,-8]});
     marker.bindPopup(popupHtml(p));
@@ -690,16 +738,23 @@ function scaleOverlay(factor) {
   makeOverlay();
 }
 function setOverlayOpacity(v) {
-  if (masterPlanOverlay) masterPlanOverlay.setOpacity(Number(v)/100);
+  var n = Number(v);
+  if(isNaN(n) || n < 0 || n > 100) return;
+  if (typeof overlayOpacity !== 'undefined') overlayOpacity = n;
+  try { localStorage.setItem("JAH_overlay_opacity_map10", String(n)); } catch(e) {}
+  if (masterPlanOverlay) masterPlanOverlay.setOpacity(n/100);
+  if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
 }
 function saveAlignment() {
   localStorage.setItem("JAH_overlay_corners_map10", JSON.stringify(overlayCorners));
+  if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
   alert("Alignment saved in this browser.");
 }
 function resetAlignment() {
   overlayCorners = JSON.parse(JSON.stringify(originalCorners));
   localStorage.removeItem("JAH_overlay_corners_map10");
   makeOverlay();
+  if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
 }
 
 function normalizeHeaderKey(k) {
@@ -902,4 +957,308 @@ function exportAgentVersion() {
 initMapLayerControls();
 addMarkers(points);
 
+
+// Robust delegated details checklist save. This keeps Admin and Agent settings persistent across refreshes.
+setTimeout(function(){
+  var box = document.getElementById('detailsChecklist');
+  if (box && !box.__hayatDetailsBound) {
+    box.__hayatDetailsBound = true;
+    box.addEventListener('change', function(e){
+      if (e.target && e.target.matches && e.target.matches('input[data-field]')) applyDetailChecklist();
+    }, true);
+  }
+}, 0);
+
+// Re-apply details after all other initializers finish, so defaults cannot override saved settings.
+setTimeout(function(){ if (typeof loadDetailFields === 'function') loadDetailFields(); }, 50);
+setTimeout(function(){ if (typeof loadDetailFields === 'function') loadDetailFields(); }, 400);
+window.addEventListener('pageshow', function(){ if (typeof loadDetailFields === 'function') loadDetailFields(); });
+
 setTimeout(function(){ if (window.HayatDataNormalize) { window.HayatDataNormalize.normalizeAllPoints(); if (typeof refreshFilterOptionsFromPoints === 'function') refreshFilterOptionsFromPoints(); if (typeof applyFilters === 'function') applyFilters(); } }, 0);
+
+
+// === Admin direct plot editing / deletion ===
+(function(){
+  function isAdminPage(){ return /admin\.html?$|\/admin(\.html)?$/i.test(location.pathname) || location.pathname.toLowerCase().indexOf('admin') !== -1; }
+  function cleanNumber(v){
+    var s = String(v == null ? '' : v).replace(/,/g,'').trim();
+    if(!s) return null;
+    var n = Number(s);
+    return isNaN(n) ? null : n;
+  }
+  function fmtNum2(x){
+    if(x === null || x === undefined || isNaN(x)) return '';
+    return Number(x).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+  function fmtPrice0(x){
+    if(x === null || x === undefined || isNaN(x)) return '';
+    return Math.round(Number(x)).toLocaleString();
+  }
+  function normalizeBasicTitle(s){
+    s = String(s || '').trim().replace(/\s+/g,' ');
+    if(!s) return '';
+    return s.toLowerCase().split(' ').map(function(w){
+      if(/^g\+\d+$/i.test(w)) return w.toUpperCase();
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    }).join(' ');
+  }
+  function normalizeStatus(s){
+    s = String(s || '').trim();
+    if(!s) return '';
+    var low = s.toLowerCase();
+    var known = {red:'Red',blue:'Blue',pink:'Pink',black:'Black',green:'Green',yellow:'Yellow',orange:'Orange'};
+    return known[low] || normalizeBasicTitle(s);
+  }
+  function recalcPlotFinancials(p){
+    p.size = cleanNumber(p.size);
+    p.price = cleanNumber(p.price);
+    p.secondPrice = cleanNumber(p.secondPrice);
+    p.priceText = fmtPrice0(p.price);
+    p.secondPriceText = fmtPrice0(p.secondPrice);
+    p.sizeText = p.size !== null ? fmtNum2(p.size) : '';
+    p.total = (p.size !== null && p.price !== null) ? p.size * p.price : null;
+    p.totalText = fmtPrice0(p.total);
+    p.deposit = p.total !== null ? p.total * 0.10 : null;
+    p.depositText = fmtNum2(p.deposit);
+    p.commission = p.total !== null ? p.total * 0.02 : null;
+    p.commissionText = fmtNum2(p.commission);
+    p.secondTotal = (p.size !== null && p.secondPrice !== null) ? p.size * p.secondPrice : null;
+    p.secondTotalText = fmtPrice0(p.secondTotal);
+    p.secondDeposit = p.secondTotal !== null ? p.secondTotal * 0.10 : null;
+    p.secondDepositText = fmtNum2(p.secondDeposit);
+    p.secondCommission = p.secondTotal !== null ? p.secondTotal * 0.02 : null;
+    p.secondCommissionText = fmtNum2(p.secondCommission);
+    var g = String(p.gfa || '').toUpperCase().replace(/\s/g,'');
+    var pct = null;
+    if(g.indexOf('G+4') !== -1) pct = 2.20;
+    else if(g.indexOf('G+1') !== -1) pct = 0.65;
+    p.gfaPct = pct !== null ? Math.round(pct * 100) : null;
+    p.gfaAllowed = (p.size !== null && pct !== null) ? p.size * pct : null;
+    p.gfaAllowedText = p.gfaAllowed !== null ? fmtNum2(p.gfaAllowed) : '';
+    if(p.lat && p.lon) p.mapsUrl = 'https://www.google.com/maps?q=' + p.lat + ',' + p.lon;
+    return p;
+  }
+  function findPointByRow(row){
+    return (window.points || []).find(function(x){ return String(x.row) === String(row); });
+  }
+  function findPointByGIS(gis){
+    return (window.points || []).find(function(x){ return String(x.gisPlot) === String(gis); });
+  }
+  function refreshAfterAdminEdit(message){
+    if(window.HayatDataNormalize && window.HayatDataNormalize.normalizeAllPoints) window.HayatDataNormalize.normalizeAllPoints();
+    if(typeof refreshFilterOptionsFromPoints === 'function') refreshFilterOptionsFromPoints();
+    if(typeof applyFilters === 'function') applyFilters();
+    else if(typeof addMarkers === 'function') addMarkers(window.points || [], false);
+    if(typeof updateSelectionPanel === 'function') updateSelectionPanel();
+    if(typeof publishCurrentPoints === 'function') publishCurrentPoints();
+    if(typeof refreshAddablePALayer === 'function') refreshAddablePALayer();
+    if(message) alert(message);
+  }
+  window.openPlotEditorByRow = function(row){
+    if(!isAdminPage()) return;
+    var p = findPointByRow(row);
+    if(!p){ alert('Plot not found.'); return; }
+    window.currentEditRow = row;
+    var modal = document.getElementById('plotEditModal');
+    if(!modal){ alert('Editor not available on this page.'); return; }
+    document.getElementById('editRowId').value = row;
+    document.getElementById('editGisPlot').disabled = true;
+    var dangerBtn = document.querySelector('#plotEditModal .plot-edit-actions .danger');
+    if(dangerBtn) dangerBtn.style.display = '';
+    var saveBtn = document.querySelector('#plotEditModal .plot-edit-actions button:first-child');
+    if(saveBtn) saveBtn.textContent = 'Save Changes';
+    document.getElementById('editGisPlot').value = p.gisPlot || '';
+    document.getElementById('editMasterPlot').value = (typeof masterPlanLabel === 'function' ? masterPlanLabel(p) : (p.masterPlot || ''));
+    document.getElementById('editAgent').value = p.agent || '';
+    document.getElementById('editMobile').value = p.mobile || '';
+    document.getElementById('editPrice').value = p.price != null ? p.price : '';
+    document.getElementById('editColor').value = normalizeStatus(p.color || '') || '';
+    document.getElementById('editType').value = p.type || '';
+    document.getElementById('editPhase').value = p.phase || '';
+    document.getElementById('editSecondAgent').value = p.secondAgent || '';
+    document.getElementById('editSecondMobile').value = p.secondMobile || '';
+    document.getElementById('editSecondPrice').value = p.secondPrice != null ? p.secondPrice : '';
+    document.getElementById('editSecondColor').value = normalizeStatus(p.secondColor || '') || '';
+    document.getElementById('editComment').value = p.comment || '';
+    document.getElementById('plotEditTitle').textContent = 'Edit Plot ' + (p.gisPlot || '');
+    var total = p.total ? money(p.total) : 'Unpriced';
+    document.getElementById('plotEditSummary').innerHTML = 'Current total: <b>' + esc(total) + '</b>' + (p.sizeText ? ' | Size: <b>' + esc(p.sizeText) + ' sqft</b>' : '');
+    modal.style.display = 'flex';
+  };
+  window.closePlotEditor = function(){
+    var modal = document.getElementById('plotEditModal');
+    if(modal) modal.style.display = 'none';
+  };
+  window.savePlotEdit = function(){
+    var row = document.getElementById('editRowId').value;
+    var p = null;
+    var isNew = String(row || '').indexOf('__add__') === 0;
+    if(isNew){
+      p = {
+        row: nextInventoryRowId(),
+        gisPlot: String(document.getElementById('editGisPlot').value || '').trim(),
+        masterPlot: String(document.getElementById('editMasterPlot').value || '').trim(),
+        lat: window.currentAddPALabel ? Number(window.currentAddPALabel.lat) : null,
+        lon: window.currentAddPALabel ? Number(window.currentAddPALabel.lng) : null,
+        coords: '', mapsUrl: ''
+      };
+      if(!p.gisPlot) p.gisPlot = p.masterPlot;
+      if(!p.masterPlot){ alert('Master Plan Plot is required.'); return; }
+      if(findInventoryByMasterPlot(p.masterPlot)) { alert('This PA plot already exists in inventory.'); return; }
+      if(!p.lat || !p.lon){ alert('Coordinates are missing for this PA plot.'); return; }
+    } else {
+      p = findPointByRow(row);
+      if(!p){ alert('Plot not found.'); return; }
+    }
+    p.agent = normalizeBasicTitle(document.getElementById('editAgent').value);
+    p.mobile = document.getElementById('editMobile').value.trim();
+    p.price = cleanNumber(document.getElementById('editPrice').value);
+    p.color = normalizeStatus(document.getElementById('editColor').value) || p.color || 'Red';
+    p.type = window.HayatDataNormalize && window.HayatDataNormalize.normalizeType ? window.HayatDataNormalize.normalizeType(document.getElementById('editType').value) : normalizeBasicTitle(document.getElementById('editType').value);
+    p.phase = document.getElementById('editPhase').value.trim();
+    p.secondAgent = normalizeBasicTitle(document.getElementById('editSecondAgent').value);
+    p.secondMobile = document.getElementById('editSecondMobile').value.trim();
+    p.secondPrice = cleanNumber(document.getElementById('editSecondPrice').value);
+    p.secondColor = normalizeStatus(document.getElementById('editSecondColor').value);
+    p.comment = document.getElementById('editComment').value.trim();
+    recalcPlotFinancials(p);
+    if(isNew){
+      window.points = window.points || [];
+      window.points.push(p);
+    }
+    closePlotEditor();
+    refreshAfterAdminEdit((isNew ? 'Plot added to inventory.' : 'Plot updated.') + ' Remember to download/upload the updated data file for GitHub.');
+  };
+  window.deletePlotByRow = function(row){
+    if(!isAdminPage()) return;
+    var p = findPointByRow(row);
+    if(!p){ alert('Plot not found.'); return; }
+    var label = (p.masterPlot ? p.masterPlot + ' / ' : '') + (p.gisPlot || '');
+    if(!confirm('Delete this plot from inventory?\n\n' + label + '\n\nThe master plan label will remain. Only the inventory marker will be removed.')) return;
+    window.points = (window.points || []).filter(function(x){ return String(x.row) !== String(row); });
+    if(window.selectedPlots && p.gisPlot) delete window.selectedPlots[String(p.gisPlot)];
+    refreshAfterAdminEdit('Plot deleted from inventory.');
+  };
+  window.deletePlotFromEditor = function(){
+    var row = document.getElementById('editRowId').value;
+    closePlotEditor();
+    deletePlotByRow(row);
+  };
+  window.generateAdminInventoryDataJS = function(){
+    var stamp = new Date().toISOString();
+    return '// Hayat Luxury GIS Admin inventory data\n// Generated: ' + stamp + '\nvar points = ' + JSON.stringify(window.points || []) + ';\n';
+  };
+  window.downloadAdminInventoryDataFile = function(){
+    var js = window.generateAdminInventoryDataJS();
+    var blob = new Blob([js], {type:'application/javascript;charset=utf-8'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'admin_inventory_data.js';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  };
+
+
+  function normPAForAdd(s){
+    var raw = String(s || '').trim().toUpperCase().replace(/\s+/g,'');
+    var m = raw.match(/^PA(\d+)_0*(\d+)$/);
+    if(m) return 'PA' + String(Number(m[1])) + '_' + String(Number(m[2]));
+    return raw;
+  }
+  function findInventoryByMasterPlot(label){
+    var n = normPAForAdd(label);
+    return (window.points || []).find(function(x){
+      var mp = normPAForAdd(x.masterPlot || (typeof masterPlanLabel === 'function' ? masterPlanLabel(x) : ''));
+      var gp = normPAForAdd(x.gisPlot || '');
+      return mp === n || gp === n;
+    });
+  }
+  function openInventoryPopupForPoint(inv){
+    if(!inv) return false;
+    var hit = (window.markers || []).find(function(obj){ return obj.point && String(obj.point.row) === String(inv.row); });
+    if(hit && hit.marker){ try{ hit.marker.openPopup(); return true; }catch(e){} }
+    try{ L.popup().setLatLng([inv.lat, inv.lon]).setContent(window.popupHtml(inv)).openOn(map); return true; }catch(e){}
+    return false;
+  }
+  function nextInventoryRowId(){
+    var max = 0;
+    (window.points || []).forEach(function(x){ var r = Number(x.row || 0); if(r > max) max = r; });
+    return max + 1;
+  }
+  function phaseFromPA(label){
+    var m = String(label || '').match(/^PA(\d+)_/i);
+    return m ? m[1] : '';
+  }
+  window.openAddPlotByPA = function(label, lat, lng){
+    if(!isAdminPage()) return;
+    var existing = findInventoryByMasterPlot(label);
+    if(existing) { openInventoryPopupForPoint(existing); return; }
+    window.currentAddPALabel = {label: normPAForAdd(label), lat:Number(lat), lng:Number(lng)};
+    var modal = document.getElementById('plotEditModal');
+    if(!modal){ alert('Editor not available on this page.'); return; }
+    document.getElementById('editRowId').value = '__add__' + normPAForAdd(label);
+    document.getElementById('editGisPlot').disabled = false;
+    document.getElementById('editGisPlot').value = normPAForAdd(label);
+    document.getElementById('editMasterPlot').value = normPAForAdd(label);
+    document.getElementById('editAgent').value = '';
+    document.getElementById('editMobile').value = '';
+    document.getElementById('editPrice').value = '';
+    document.getElementById('editColor').value = 'Red';
+    document.getElementById('editType').value = 'Plot';
+    document.getElementById('editPhase').value = phaseFromPA(label);
+    document.getElementById('editSecondAgent').value = '';
+    document.getElementById('editSecondMobile').value = '';
+    document.getElementById('editSecondPrice').value = '';
+    document.getElementById('editSecondColor').value = '';
+    document.getElementById('editComment').value = '';
+    document.getElementById('plotEditTitle').textContent = 'Add Plot ' + normPAForAdd(label);
+    document.getElementById('plotEditSummary').innerHTML = 'New inventory record from master plan PA label. Coordinates are filled automatically from the master plan label position.';
+    var dangerBtn = document.querySelector('#plotEditModal .plot-edit-actions .danger');
+    if(dangerBtn) dangerBtn.style.display = 'none';
+    var saveBtn = document.querySelector('#plotEditModal .plot-edit-actions button:first-child');
+    if(saveBtn) saveBtn.textContent = 'Add Plot';
+    modal.style.display = 'flex';
+  };
+  window.refreshAddablePALayer = function(){
+    if(!isAdminPage() || !window.L || !window.map || !window.JAH_PA_LABELS) return;
+    try{ if(window.addablePALayer) map.removeLayer(window.addablePALayer); }catch(e){}
+    if(!map.getPane('paAddPane')){
+      map.createPane('paAddPane');
+      // Keep PA add hotspots below inventory markers so existing pins receive clicks first.
+      map.getPane('paAddPane').style.zIndex = 500;
+      map.getPane('paAddPane').style.pointerEvents = 'auto';
+    }
+    window.addablePALayer = L.layerGroup();
+    window.JAH_PA_LABELS.forEach(function(pa){
+      var label = normPAForAdd(pa.t);
+      var existingInventory = findInventoryByMasterPlot(label);
+      if(existingInventory) return;
+      var icon = L.divIcon({
+        className:'pa-add-hotspot',
+        html:'<span title="Add '+esc(label)+' to inventory"></span>',
+        iconSize:[34,24],
+        iconAnchor:[17,12]
+      });
+      var m = L.marker([pa.lat, pa.lng], {icon:icon, pane:'paAddPane', keyboard:false, interactive:true});
+      m.bindPopup('<div class="popup-title">'+esc(label)+'</div><div class="small-note">This plot is not in the inventory.</div><div class="admin-actions"><button onclick="openAddPlotByPA(\''+esc(label)+'\','+Number(pa.lat)+','+Number(pa.lng)+')">+ Add to Inventory</button></div>');
+      m.addTo(window.addablePALayer);
+    });
+    window.addablePALayer.addTo(map);
+  };
+  setTimeout(function(){ refreshAddablePALayer(); }, 900);
+
+  var previousPopupHtml = window.popupHtml;
+  window.popupHtml = function(p){
+    var base = previousPopupHtml ? previousPopupHtml(p) : '';
+    if(!isAdminPage() || !p) return base;
+    var rowId = Number(p.row || 0);
+    var actions = '<div class="admin-actions"><button onclick="openPlotEditorByRow(' + rowId + ')">Edit Plot</button><button class="danger" onclick="deletePlotByRow(' + rowId + ')">Delete Plot</button></div>';
+    return base + actions;
+  };
+  // Rebind any markers that were created before this module loaded.
+  setTimeout(function(){
+    try{ if(window.markers) window.markers.forEach(function(obj){ obj.marker.bindPopup(window.popupHtml(obj.point)); }); }catch(e){}
+  }, 0);
+})();
+// === End Admin direct plot editing / deletion ===
