@@ -13,6 +13,25 @@
 <link rel="stylesheet" href="css/admin.css"/>
 </head>
 <body>
+<script id="HAYAT_ADMIN_PASSWORD_GATE">
+(function(){
+  var PASSWORD = 'hayat';
+  var KEY = 'HAYAT_ADMIN_UNLOCKED_V31';
+  try{
+    if(sessionStorage.getItem(KEY)==='1') return;
+    var ok = false;
+    for(var i=0;i<3;i++){
+      var v = prompt('Admin password');
+      if(v === null) break;
+      if(v === PASSWORD){ ok = true; break; }
+      alert('Incorrect password');
+    }
+    if(ok){ sessionStorage.setItem(KEY,'1'); }
+    else { document.documentElement.innerHTML = '<body style="font-family:Arial;padding:30px"><h2>Access denied</h2></body>'; }
+  }catch(e){}
+})();
+</script>
+
 <button id="showBtn" class="toggle" onclick="showFilters()" style="display:none">☑ Show filters</button>
 <div id="map"></div>
 

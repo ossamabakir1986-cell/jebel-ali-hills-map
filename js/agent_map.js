@@ -26,11 +26,11 @@ var originalCorners = {
   tr: [24.919819914418028, 55.00208048799185],
   bl: [24.881341646409087, 54.942764658207274]
 };
-var overlayCorners = JSON.parse(localStorage.getItem("JAH_overlay_corners_map10") || "null") || JSON.parse(JSON.stringify(originalCorners));
-var overlayOpacity = Number(localStorage.getItem("JAH_overlay_opacity_map10") || "70");
+var overlayCorners = JSON.parse(localStorage.getItem("JAH_overlay_corners_v31") || "null") || JSON.parse(JSON.stringify(originalCorners));
+var overlayOpacity = Number(localStorage.getItem("JAH_overlay_opacity_v31") || "70");
 if (!isFinite(overlayOpacity) || overlayOpacity < 60) {
   overlayOpacity = 70;
-  try { localStorage.setItem("JAH_overlay_opacity_map10", "70"); } catch(e) {}
+  try { localStorage.setItem("JAH_overlay_opacity_v31", "70"); } catch(e) {}
 }
 if (isNaN(overlayOpacity) || overlayOpacity < 0 || overlayOpacity > 100) overlayOpacity = 45;
 var masterPlanOverlay;
@@ -59,7 +59,7 @@ window.setOverlayOpacityFromPublish = function(v){
   var n = Number(v);
   if(isNaN(n) || n < 0 || n > 100) return false;
   overlayOpacity = n;
-  try { localStorage.setItem("JAH_overlay_opacity_map10", String(overlayOpacity)); } catch(e) {}
+  try { localStorage.setItem("JAH_overlay_opacity_v31", String(overlayOpacity)); } catch(e) {}
   if(masterPlanOverlay && masterPlanOverlay.setOpacity) masterPlanOverlay.setOpacity(overlayOpacity/100);
   var slider = document.getElementById('opacitySlider');
   if(slider) slider.value = String(Math.round(overlayOpacity));
@@ -70,7 +70,7 @@ window.setOverlayCornersFromPublish = function(corners){
   function validPt(pt){ return Array.isArray(pt) && pt.length === 2 && isFinite(Number(pt[0])) && isFinite(Number(pt[1])); }
   if(!validPt(corners.tl) || !validPt(corners.tr) || !validPt(corners.bl)) return false;
   overlayCorners = JSON.parse(JSON.stringify(corners));
-  try { localStorage.setItem("JAH_overlay_corners_map10", JSON.stringify(overlayCorners)); } catch(e) {}
+  try { localStorage.setItem("JAH_overlay_corners_v31", JSON.stringify(overlayCorners)); } catch(e) {}
   makeOverlay();
   return true;
 };

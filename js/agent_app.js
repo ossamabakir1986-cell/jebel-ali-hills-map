@@ -116,7 +116,7 @@ function num(id) { var v = val(id); return v === "" ? null : parseFloat(v); }
 function esc(s) { return String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
 var detailFieldsKey = 'HAYAT_JAH_DETAIL_FIELDS_V21';
-var detailSettingsKey = (window.HAYAT_SYNC_SETTINGS_KEY || 'HAYAT_JAH_PUBLISHED_SETTINGS_V21');
+var detailSettingsKey = (window.HAYAT_SYNC_SETTINGS_KEY || 'HAYAT_JAH_PUBLISHED_SETTINGS_V31');
 var legacyDetailFieldsKey = (location.pathname.indexOf('agent') !== -1 ? 'hayatAgentDetailFields' : 'hayatAdminDetailFields');
 var detailFieldDefaults = {
   masterPlot:true, agent:true, mobile:true, size:true, pricing:true, secondOffer:true,
@@ -535,18 +535,18 @@ function setOverlayOpacity(v) {
   var n = Number(v);
   if(isNaN(n) || n < 0 || n > 100) return;
   if (typeof overlayOpacity !== 'undefined') overlayOpacity = n;
-  try { localStorage.setItem("JAH_overlay_opacity_map10", String(n)); } catch(e) {}
+  try { localStorage.setItem("JAH_overlay_opacity_v31", String(n)); } catch(e) {}
   if (masterPlanOverlay) masterPlanOverlay.setOpacity(n/100);
   if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
 }
 function saveAlignment() {
-  localStorage.setItem("JAH_overlay_corners_map10", JSON.stringify(overlayCorners));
+  localStorage.setItem("JAH_overlay_corners_v31", JSON.stringify(overlayCorners));
   if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
   alert("Alignment saved in this browser.");
 }
 function resetAlignment() {
   overlayCorners = JSON.parse(JSON.stringify(originalCorners));
-  localStorage.removeItem("JAH_overlay_corners_map10");
+  localStorage.removeItem("JAH_overlay_corners_v31");
   makeOverlay();
   if(!window.HAYAT_APPLYING_SETTINGS && typeof window.saveCurrentPublishSettings === 'function') window.saveCurrentPublishSettings();
 }
