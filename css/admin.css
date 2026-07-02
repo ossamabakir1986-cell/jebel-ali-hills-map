@@ -1,0 +1,246 @@
+
+html, body { height:100%; margin:0; font-family: Arial, sans-serif; }
+#map { height:100%; width:100%; }
+.panel {
+  position:absolute; top:10px; left:10px; z-index:1000; background:#fff;
+  padding:10px; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,.28);
+  width:390px; max-width:calc(100vw - 24px); font-size:13px;
+}
+.toggle {
+  position:absolute; top:10px; left:10px; z-index:1100; background:#0b2f27; color:#d6a94a;
+  border:0; padding:9px 12px; border-radius:8px; font-weight:bold; cursor:pointer; width:auto;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+}
+.panel h3 { margin:0 0 8px; font-size:15px; }
+.row { display:flex; gap:6px; margin:5px 0; }
+input, select, button {
+  font-size:13px; padding:7px; border:1px solid #ccc; border-radius:7px; width:100%; box-sizing:border-box;
+}
+button { background:#0b2f27; color:#d6a94a; font-weight:bold; cursor:pointer; }
+.hideBtn { background:#666; color:#fff; }
+.lbl {
+  border:1px solid rgba(0,0,0,.55); border-radius:4px; padding:1px 4px; font:bold 10px Arial; letter-spacing:.1px; white-space:nowrap;
+  box-shadow:0 1px 2px rgba(0,0,0,.2);
+}
+.lbl-red { background:#e53935; color:#fff; }
+.lbl-pink { background:#ff5da2; color:#111; }
+.lbl-blue { background:#1e88e5; color:#fff; }
+.lbl-black { background:#111; color:#fff; }
+.lbl-green { background:#43a047; color:#fff; }
+.lbl-yellow { background:#fdd835; color:#111; }
+.lbl-orange { background:#fb8c00; color:#111; }
+.lbl-default { background:#666; color:#fff; }
+.stats { margin-top:8px; padding-top:6px; border-top:1px solid #ddd; line-height:1.45; }
+.popup-table { border-collapse: collapse; font-size:13px; min-width:280px; }
+.popup-table td { padding:3px 6px; border-bottom:1px solid #eee; vertical-align:top; }
+.popup-table td:first-child { font-weight:bold; color:#333; }
+.popup-table a { color:#0b63ce; font-weight:bold; text-decoration:none; }
+.small-note { font-size:11px; color:#555; margin-top:5px; }
+.legend { display:flex; gap:7px; flex-wrap:wrap; margin:6px 0; font-size:11px; }
+.legend span { display:inline-flex; align-items:center; gap:3px; }
+.dot { width:10px; height:10px; border-radius:50%; border:1px solid #555; display:inline-block; }
+@media(max-width:600px){
+  .panel { top:8px; left:8px; width:calc(100vw - 36px); max-height:48vh; overflow:auto; }
+  .toggle { top:8px; left:8px; }
+  .lbl { font-size:8px; padding:1px 3px; }
+}
+
+/* === Hayat Luxury V2.0 - Safe UI update 1 === */
+:root {
+  --hayat-emerald:#10211D;
+  --hayat-emerald-2:#1F3F37;
+  --hayat-gold:#CEA350;
+  --hayat-cream:#F9F7EF;
+  --hayat-charcoal:#1E1C1B;
+}
+body { font-family: "Red Hat Display", "Red Hat Text", Arial, sans-serif; background:var(--hayat-emerald); }
+.panel {
+  background:rgba(249,247,239,.96) !important;
+  color:var(--hayat-charcoal);
+  border:1px solid rgba(206,163,80,.35);
+  border-left:4px solid var(--hayat-gold);
+  box-shadow:0 14px 35px rgba(16,33,29,.35) !important;
+}
+.panel h3 { color:var(--hayat-emerald); letter-spacing:.2px; font-weight:800; }
+.toggle, button { background:var(--hayat-emerald) !important; color:var(--hayat-gold) !important; border:1px solid rgba(206,163,80,.45) !important; }
+button:hover { background:var(--hayat-emerald-2) !important; }
+.hideBtn { background:#6d6757 !important; color:#fff !important; }
+input, select { border:1px solid rgba(16,33,29,.22) !important; background:#fffdfa; }
+input:focus, select:focus { outline:2px solid rgba(206,163,80,.35); border-color:var(--hayat-gold) !important; }
+.stats { border-top:1px solid rgba(16,33,29,.18) !important; }
+.popup-table { min-width:300px; font-family:"Red Hat Text", Arial, sans-serif; }
+.popup-table td:first-child { color:var(--hayat-emerald) !important; }
+.leaflet-popup-content-wrapper { border-radius:14px !important; border:1px solid rgba(206,163,80,.45); box-shadow:0 12px 30px rgba(0,0,0,.25); }
+.leaflet-popup-content { margin:13px 15px !important; }
+.leaflet-control-zoom { border:none !important; box-shadow:0 8px 24px rgba(0,0,0,.28) !important; }
+.leaflet-control-zoom a { background:var(--hayat-emerald) !important; color:var(--hayat-gold) !important; border-color:rgba(206,163,80,.35) !important; }
+.leaflet-control-zoom a:hover { background:var(--hayat-emerald-2) !important; }
+.hayat-watermark {
+  position:absolute; right:18px; bottom:24px; z-index:900; pointer-events:none;
+  display:flex; align-items:center; gap:8px;
+  background:rgba(16,33,29,.82); color:var(--hayat-cream);
+  border:1px solid rgba(206,163,80,.5); border-radius:14px;
+  padding:8px 12px; box-shadow:0 8px 25px rgba(0,0,0,.25);
+  font-size:11px; letter-spacing:.8px; text-transform:uppercase;
+}
+.hayat-watermark img { width:28px; height:28px; border-radius:50%; object-fit:cover; opacity:.95; }
+.hayat-watermark strong { color:var(--hayat-gold); display:block; font-size:12px; }
+.hayat-diagonal-watermark {
+  position:absolute; inset:0; z-index:650; pointer-events:none; overflow:hidden;
+}
+.hayat-diagonal-watermark:before {
+  content:"HAYAT LUXURY · INTERNAL USE";
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) rotate(-28deg);
+  font-size:54px; white-space:nowrap; letter-spacing:8px; font-weight:700;
+  color:rgba(16,33,29,.075); text-shadow:0 0 1px rgba(249,247,239,.25);
+}
+.hayat-brand-chip {
+  display:flex; align-items:center; gap:8px; margin-bottom:8px;
+  padding-bottom:8px; border-bottom:1px solid rgba(16,33,29,.12);
+}
+.hayat-brand-chip img { width:34px; height:34px; border-radius:8px; object-fit:cover; }
+.hayat-brand-chip .brand-title { line-height:1.1; }
+.hayat-brand-chip .brand-title b { display:block; color:var(--hayat-emerald); font-size:14px; }
+.hayat-brand-chip .brand-title span { font-size:10px; color:#6b6658; letter-spacing:.8px; text-transform:uppercase; }
+@media(max-width:600px) {
+  .hayat-watermark { right:10px; bottom:14px; padding:6px 8px; font-size:9px; }
+  .hayat-watermark img { width:22px; height:22px; }
+  .hayat-diagonal-watermark:before { font-size:28px; letter-spacing:4px; }
+}
+/* === End Hayat Luxury V2.0 safe UI update 1 === */
+
+.section-title{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#CEA350;margin:12px 0 6px;font-weight:800;}
+.details-box{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;background:rgba(249,247,239,.06);border:1px solid rgba(206,163,80,.28);border-radius:10px;padding:8px;margin:6px 0;}
+.details-box label{font-size:11px;color:inherit;display:flex;align-items:center;gap:5px;line-height:1.2;}
+.details-box input{width:auto;padding:0;margin:0;accent-color:#CEA350;}
+.popup-title{font-family:Georgia,'Times New Roman',serif;font-size:17px;color:#10211D;margin-bottom:6px;border-bottom:1px solid rgba(206,163,80,.45);padding-bottom:5px;}
+.copy-actions{display:flex;gap:6px;margin-top:9px;}
+.copy-actions button{font-size:12px;padding:7px 8px;border-radius:8px;}
+
+.selection-box{border:1px solid rgba(206,163,80,.35);border-radius:10px;padding:8px;margin:8px 0;background:rgba(206,163,80,.06);}
+.selection-title{font-size:12px;text-transform:uppercase;letter-spacing:2px;color:var(--hayat-gold);font-weight:800;margin-bottom:6px;}
+.selection-stats{font-size:12px;line-height:1.45;color:var(--hayat-ink);margin-top:6px;}
+.selection-on{background:var(--hayat-gold)!important;color:var(--hayat-emerald)!important;}
+@media(max-width:600px){.details-box{grid-template-columns:1fr;}}
+
+/* === Map layer visibility controls === */
+.layer-box{border:1px solid rgba(206,163,80,.35);border-radius:10px;padding:8px;margin:8px 0;background:rgba(255,255,255,.42);}
+.layer-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;font-size:12px;color:#1b2b25;}
+.layer-grid label{display:flex;align-items:center;gap:6px;line-height:1.2;}
+.layer-grid input{width:auto;margin:0;accent-color:#CEA350;}
+.layer-note{font-size:10px;color:#716956;margin-top:5px;line-height:1.25;}
+@media(max-width:600px){.layer-grid{grid-template-columns:1fr;}}
+/* === End map layer visibility controls === */
+
+
+.master-label {
+  background: rgba(249,247,239,.88);
+  border: 1px solid rgba(16,33,29,.45);
+  color: #10211D;
+  border-radius: 3px;
+  padding: 1px 3px;
+  font: 800 10px Arial, sans-serif;
+  letter-spacing: .1px;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  pointer-events:none;
+}
+@media(max-width:600px){ .master-label{font-size:8px;padding:1px 2px;} }
+
+
+/* === PA label readability boost === */
+.leaflet-tooltip.lbl{
+  font: 900 13px Arial, sans-serif !important;
+  padding: 3px 6px !important;
+  border: 2px solid rgba(255,255,255,.92) !important;
+  border-radius: 6px !important;
+  letter-spacing: .15px !important;
+  line-height: 1.05 !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,.55) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.35) !important;
+}
+.leaflet-tooltip.lbl-blue, .leaflet-tooltip.lbl-red, .leaflet-tooltip.lbl-black, .leaflet-tooltip.lbl-green{ color:#fff !important; }
+.leaflet-tooltip.lbl-pink, .leaflet-tooltip.lbl-yellow, .leaflet-tooltip.lbl-orange{ color:#111 !important; text-shadow: 0 1px 1px rgba(255,255,255,.35) !important; }
+@media(max-width:600px){ .leaflet-tooltip.lbl{font-size:11px!important;padding:2px 5px!important;} }
+/* === End PA label readability boost === */
+
+
+/* === Smart Master Plan stealth PA labels === */
+.pa-master-label-icon{
+  pointer-events:none;
+  white-space:nowrap;
+  font-size:var(--pa-label-font-size,10px);
+  opacity:var(--pa-label-opacity,.75);
+}
+.pa-master-label-icon span{
+  display:inline-block;
+  transform:translate(-50%,-50%);
+  position:relative;
+  color:rgba(35,43,39,.88);
+  font:800 var(--pa-label-font-size,10px) Arial, sans-serif;
+  letter-spacing:.05px;
+  line-height:1;
+  text-shadow:0 .4px .8px rgba(255,255,230,.7);
+}
+/* Pale mask: covers the blurry PDF text underneath while still blending into yellow plots. */
+.pa-master-label-icon span::before{
+  content:"";
+  position:absolute;
+  left:50%; top:50%;
+  transform:translate(-50%,-50%);
+  width:calc(100% + var(--pa-label-mask-x,8px));
+  height:calc(100% + var(--pa-label-mask-y,4px));
+  background:rgba(247,244,188,var(--pa-label-mask-opacity,.55));
+  border-radius:2px;
+  z-index:-1;
+  box-shadow:0 0 2px rgba(247,244,188,var(--pa-label-mask-opacity,.55));
+}
+@media(max-width:600px){.pa-master-label-icon span{font-size:var(--pa-label-font-size,9px);}}
+.pa-master-label-icon.inventory-fallback span{
+  transform:translate(-50%, 8px);
+  color:rgba(35,43,39,.86);
+}
+.pa-master-label-icon.inventory-fallback span::before{
+  background:rgba(247,244,188,var(--pa-label-mask-opacity,.45));
+}
+
+/* === End Smart Master Plan stealth PA labels === */
+
+
+.agent-workflow-box{border:1px solid rgba(206,163,80,.35);border-radius:10px;padding:10px;margin-bottom:12px;background:rgba(249,247,239,.72)}
+.agent-workflow-box .small-note{font-size:12px;line-height:1.35;color:#6d6658}
+
+
+/* === Admin Plot Editor === */
+.plot-edit-modal{position:fixed;inset:0;z-index:5000;background:rgba(16,33,29,.55);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;}
+.plot-edit-card{width:min(720px,96vw);max-height:92vh;overflow:auto;background:#F9F7EF;border:1px solid rgba(206,163,80,.65);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.45);padding:16px;color:#1E1C1B;}
+.plot-edit-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(16,33,29,.16);padding-bottom:10px;margin-bottom:12px;}
+.plot-edit-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:#8A6D31;font-weight:800;}
+.plot-edit-head h3{margin:3px 0 0;color:#10211D;font-size:20px;}
+.plot-edit-close{width:38px!important;height:38px!important;border-radius:50%!important;font-size:22px!important;line-height:1!important;padding:0!important;}
+.plot-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.plot-edit-grid label{font-size:11px;font-weight:800;color:#10211D;text-transform:uppercase;letter-spacing:.05em;display:flex;flex-direction:column;gap:5px;}
+.plot-edit-grid input,.plot-edit-grid select,.plot-edit-grid textarea{font-size:14px!important;text-transform:none!important;letter-spacing:normal!important;font-weight:500!important;background:#fffdfa!important;}
+.plot-edit-grid input:disabled{background:#ece8dc!important;color:#666!important;}
+.plot-edit-wide{grid-column:1/-1;}
+.plot-edit-summary{margin-top:10px;padding:9px;border-radius:10px;background:rgba(206,163,80,.12);font-size:12px;line-height:1.45;color:#332b1b;}
+.plot-edit-actions{display:flex;gap:8px;margin-top:12px;}
+.plot-edit-actions button{width:auto;min-width:130px;}
+.plot-edit-actions .danger{background:#9b1c1c!important;color:#fff!important;border-color:#9b1c1c!important;}
+.plot-edit-actions .secondary{background:#6d6757!important;color:#fff!important;}
+.admin-actions{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px dashed rgba(16,33,29,.2);}
+.admin-actions button{font-size:12px;padding:7px 8px;border-radius:8px;}
+.admin-actions .danger{background:#9b1c1c!important;color:#fff!important;border-color:#9b1c1c!important;}
+@media(max-width:600px){.plot-edit-grid{grid-template-columns:1fr}.plot-edit-actions{flex-direction:column}.plot-edit-actions button{width:100%;}.plot-edit-card{padding:12px;}}
+/* === End Admin Plot Editor === */
+
+/* Invisible click target for adding master-plan-only PA plots to inventory */
+.pa-add-hotspot span{display:block;width:34px;height:24px;border-radius:12px;background:rgba(255,255,255,0);cursor:pointer;}
+.pa-add-hotspot span:hover{background:rgba(212,175,55,.18);outline:1px solid rgba(212,175,55,.45);}
+
+
+/* v3.0.1: keep plot markers and labels behind the Leaflet popup */
+.leaflet-popup-pane{z-index:1200 !important;}
+.leaflet-tooltip-pane{z-index:640 !important;}
+.leaflet-popup{z-index:1201 !important;}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{position:relative;z-index:1202;}
