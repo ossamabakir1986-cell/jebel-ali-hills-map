@@ -272,6 +272,7 @@
         'js/v3327_agent_dropdown_mobile_autofill.js',
         'js/v3329_size_save_copy_features_fix.js',
         'js/v3331_gfa_field_display_restore.js',
+        'js/v3333_popup_gfa_override_last_updated.js',
         'assets/jah_pa_labels.js',
         'README_HAYAT_GIS_V3_STABLE.txt','README_SETTINGS_SYNC_FIX.txt','README_V3_0_3_DETAILS_SYNC_FIX.txt','README_V3_1_STABLE.txt','README_V3331_GFA_FIELD_DISPLAY_RESTORE.txt'
       ];

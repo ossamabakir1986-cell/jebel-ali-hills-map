@@ -30,7 +30,8 @@
       sessionStorage.setItem(KEY,'1');
     } else {
       document.open();
-      document.write('<!doctype html><html><head><meta charset="utf-8"><title>Access denied</title></head><body style="font-family:Arial;padding:30px"><h2>Access denied</h2></body></html>');
+      document.write('<!doctype html><html><head><meta charset="utf-8"><title>Access denied</title></head><body style="font-family:Arial;padding:30px"><h2>Access denied</h2><script src="js/v3333_popup_gfa_override_last_updated.js"></script>
+</body></html>');
       document.close();
       throw new Error('Admin access denied');
     }
@@ -256,5 +257,6 @@
 <script src="js/v3327_agent_dropdown_mobile_autofill.js"></script>
 <script src="js/v3329_size_save_copy_features_fix.js"></script>
 <script src="js/v3331_gfa_field_display_restore.js"></script>
+<script src="js/v3333_popup_gfa_override_last_updated.js"></script>
 </body>
 </html>
