@@ -2,3 +2,11 @@
   setTimeout(function(){
     if(window.addCrispMasterPlanLabels) addCrispMasterPlanLabels();
   }, 500);
+
+  setTimeout(function(){
+    if(document.querySelector('script[src*="v3335_auto_last_updated_multi_filters.js"]')) return;
+    var s=document.createElement('script');
+    s.src='js/v3335_auto_last_updated_multi_filters.js?v=3335';
+    s.async=false;
+    document.body.appendChild(s);
+  }, 1200);
