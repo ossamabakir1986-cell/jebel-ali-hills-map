@@ -26,3 +26,11 @@
     s.async=false;
     document.body.appendChild(s);
   }, 1700);
+
+  setTimeout(function(){
+    if(document.querySelector('script[src*="v3338_final_filter_tab_layout_style.js"]')) return;
+    var s=document.createElement('script');
+    s.src='js/v3338_final_filter_tab_layout_style.js?v=3338';
+    s.async=false;
+    document.body.appendChild(s);
+  }, 1950);
