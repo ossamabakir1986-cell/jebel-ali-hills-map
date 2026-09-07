@@ -10,3 +10,11 @@
     s.async=false;
     document.body.appendChild(s);
   }, 1200);
+
+  setTimeout(function(){
+    if(document.querySelector('script[src*="v3336_plot_color_filter_tab_style.js"]')) return;
+    var s=document.createElement('script');
+    s.src='js/v3336_plot_color_filter_tab_style.js?v=3336';
+    s.async=false;
+    document.body.appendChild(s);
+  }, 1450);
