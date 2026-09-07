@@ -4,42 +4,9 @@
   }, 500);
 
   setTimeout(function(){
-    if(document.querySelector('script[src*="v3335_auto_last_updated_multi_filters.js"]')) return;
+    if(document.querySelector('script[src*="v3340_stable_filter_tabs.js"]')) return;
     var s=document.createElement('script');
-    s.src='js/v3335_auto_last_updated_multi_filters.js?v=3335';
+    s.src='js/v3340_stable_filter_tabs.js?v=3340';
     s.async=false;
     document.body.appendChild(s);
   }, 1200);
-
-  setTimeout(function(){
-    if(document.querySelector('script[src*="v3336_plot_color_filter_tab_style.js"]')) return;
-    var s=document.createElement('script');
-    s.src='js/v3336_plot_color_filter_tab_style.js?v=3336';
-    s.async=false;
-    document.body.appendChild(s);
-  }, 1450);
-
-  setTimeout(function(){
-    if(document.querySelector('script[src*="v3337_filter_tab_cleanup_names.js"]')) return;
-    var s=document.createElement('script');
-    s.src='js/v3337_filter_tab_cleanup_names.js?v=3337';
-    s.async=false;
-    document.body.appendChild(s);
-  }, 1700);
-
-
-  setTimeout(function(){
-    if(document.querySelector('script[src*="v3338_final_filter_tab_layout_style.js"]')) return;
-    var s=document.createElement('script');
-    s.src='js/v3338_final_filter_tab_layout_style.js?v=3338';
-    s.async=false;
-    document.body.appendChild(s);
-  }, 1950);
-
-  setTimeout(function(){
-    if(document.querySelector('script[src*="v3339_unified_filter_dropdowns.js"]')) return;
-    var s=document.createElement('script');
-    s.src='js/v3339_unified_filter_dropdowns.js?v=3339';
-    s.async=false;
-    document.body.appendChild(s);
-  }, 2250);
