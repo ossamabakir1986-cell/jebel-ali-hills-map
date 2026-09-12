@@ -33,3 +33,11 @@
     s.async=false;
     document.body.appendChild(s);
   }, 2350);
+
+  setTimeout(function(){
+    if(document.querySelector('script[src*="v3346_mobile_tools_visibility.js"]')) return;
+    var s=document.createElement('script');
+    s.src='js/v3346_mobile_tools_visibility.js?v=3346';
+    s.async=false;
+    document.body.appendChild(s);
+  }, 2700);
