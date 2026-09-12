@@ -33,3 +33,11 @@
     s.async=false;
     document.body.appendChild(s);
   }, 2050);
+
+  setTimeout(function(){
+    if(document.querySelector('script[src*="v3352_guide_language_links_fix.js"]')) return;
+    var s=document.createElement('script');
+    s.src='js/v3352_guide_language_links_fix.js?v=3352';
+    s.async=false;
+    document.body.appendChild(s);
+  }, 2300);
