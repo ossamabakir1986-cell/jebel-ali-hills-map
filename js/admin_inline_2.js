@@ -19,25 +19,9 @@
   }, 1300);
 
   setTimeout(function(){
-    if(document.querySelector('script[src*="v3347_top_filter_tools_detailed_updates.js"]')) return;
+    if(document.querySelector('script[src*="v3350_single_quick_tools_panel.js"]')) return;
     var s=document.createElement('script');
-    s.src='js/v3347_top_filter_tools_detailed_updates.js?v=3347';
+    s.src='js/v3350_single_quick_tools_panel.js?v=3350';
     s.async=false;
     document.body.appendChild(s);
   }, 1700);
-
-  setTimeout(function(){
-    if(document.querySelector('script[src*="v3348_fast_arabic_no_observer.js"]')) return;
-    var s=document.createElement('script');
-    s.src='js/v3348_fast_arabic_no_observer.js?v=3348';
-    s.async=false;
-    document.body.appendChild(s);
-  }, 2200);
-
-  setTimeout(function(){
-    if(document.querySelector('script[src*="v3349_what_changed_panel_fix.js"]')) return;
-    var s=document.createElement('script');
-    s.src='js/v3349_what_changed_panel_fix.js?v=3349';
-    s.async=false;
-    document.body.appendChild(s);
-  }, 2600);
