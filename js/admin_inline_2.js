@@ -33,3 +33,11 @@
     s.async=false;
     document.body.appendChild(s);
   }, 2200);
+
+  setTimeout(function(){
+    if(document.querySelector('script[src*="v3349_what_changed_panel_fix.js"]')) return;
+    var s=document.createElement('script');
+    s.src='js/v3349_what_changed_panel_fix.js?v=3349';
+    s.async=false;
+    document.body.appendChild(s);
+  }, 2600);
