@@ -19,9 +19,9 @@
   }, 1300);
 
   setTimeout(function(){
-    if(document.querySelector('script[src*="v3353_unified_tools_translation.js"]')) return;
+    if(document.querySelector('script[src*="v3354_unified_toolbar_translation_selected_guide.js"]')) return;
     var s=document.createElement('script');
-    s.src='js/v3353_unified_tools_translation.js?v=3353';
+    s.src='js/v3354_unified_toolbar_translation_selected_guide.js?v=3354';
     s.async=false;
     document.body.appendChild(s);
   }, 1700);
