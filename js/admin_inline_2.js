@@ -41,3 +41,11 @@
     s.async=false;
     document.body.appendChild(s);
   }, 2700);
+
+  setTimeout(function(){
+    if(document.querySelector('script[src*="v3347_top_filter_tools_detailed_updates.js"]')) return;
+    var s=document.createElement('script');
+    s.src='js/v3347_top_filter_tools_detailed_updates.js?v=3347';
+    s.async=false;
+    document.body.appendChild(s);
+  }, 3200);
