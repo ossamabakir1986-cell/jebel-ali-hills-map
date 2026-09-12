@@ -25,3 +25,11 @@
     s.async=false;
     document.body.appendChild(s);
   }, 1700);
+
+  setTimeout(function(){
+    if(document.querySelector('script[src*="v3351_small_quick_tools_buttons.js"]')) return;
+    var s=document.createElement('script');
+    s.src='js/v3351_small_quick_tools_buttons.js?v=3351';
+    s.async=false;
+    document.body.appendChild(s);
+  }, 2050);
