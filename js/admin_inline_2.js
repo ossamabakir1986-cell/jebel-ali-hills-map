@@ -25,3 +25,11 @@
     s.async=false;
     document.body.appendChild(s);
   }, 1700);
+
+  setTimeout(function(){
+    if(document.querySelector('script[src*="v3344_role_aware_updates_bilingual_guides.js"]')) return;
+    var s=document.createElement('script');
+    s.src='js/v3344_role_aware_updates_bilingual_guides.js?v=3344';
+    s.async=false;
+    document.body.appendChild(s);
+  }, 2150);
