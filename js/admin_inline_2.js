@@ -11,6 +11,14 @@
   }, 900);
 
   setTimeout(function(){
+    if(document.querySelector('script[src*="v3355_pa14_223_224_master_swap_fix.js"]')) return;
+    var s=document.createElement('script');
+    s.src='js/v3355_pa14_223_224_master_swap_fix.js?v=3355';
+    s.async=false;
+    document.body.appendChild(s);
+  }, 1200);
+
+  setTimeout(function(){
     if(document.querySelector('script[src*="v3341_stable_filter_tabs_all_button_fix.js"]')) return;
     var s=document.createElement('script');
     s.src='js/v3341_stable_filter_tabs_all_button_fix.js?v=3341';
