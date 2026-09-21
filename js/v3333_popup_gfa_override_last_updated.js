@@ -310,8 +310,28 @@
 (function(){
   if(window.__HAYAT_CAPTURE_LINK_BOOTSTRAPPED) return;
   window.__HAYAT_CAPTURE_LINK_BOOTSTRAPPED = true;
+  window.HAYAT_GET_SELECTED_IDS = function(){
+    var ids=[];
+    function add(value){
+      var id=String(value == null ? '' : value).trim();
+      if(id && ids.indexOf(id)===-1) ids.push(id);
+    }
+    try {
+      if(typeof window.selectedList==='function') (window.selectedList() || []).forEach(function(p){add(p && p.gisPlot);});
+    } catch(e) {}
+    try {
+      Object.keys(window.selectedPlots || {}).forEach(function(id){if(window.selectedPlots[id]) add(id);});
+    } catch(e) {}
+    try {
+      (window.markers || []).forEach(function(item){
+        var marker=item && item.marker;
+        if(marker && marker.options && Number(marker.options.radius)>=10) add(item.point && item.point.gisPlot);
+      });
+    } catch(e) {}
+    return ids;
+  };
   var script = document.createElement('script');
-  script.src = 'js/capture_link.js';
+  script.src = 'js/capture_link.js?v=20260922-3';
   script.defer = true;
   document.head.appendChild(script);
 })();
