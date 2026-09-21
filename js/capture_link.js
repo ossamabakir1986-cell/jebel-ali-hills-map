@@ -28,16 +28,24 @@
 
   function openCaptureStudio(){
     var selected = listSelectedIds();
+    var bounds = currentBounds();
     var context = {
       version:1,
       source:location.pathname.indexOf('admin') !== -1 ? 'admin' : 'agent',
       selected:selected,
-      bounds:currentBounds(),
+      bounds:bounds,
       createdAt:new Date().toISOString()
     };
     try { sessionStorage.setItem('JAH_CAPTURE_CONTEXT_V1', JSON.stringify(context)); } catch(e) {}
+    var handoff='capture-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+    try {
+      localStorage.setItem('JAH_CAPTURE_HANDOFF_V1', JSON.stringify({token:handoff,context:context}));
+    } catch(e) {}
     var mode = selected.length ? 'selected' : 'current';
-    window.open('capture.html?mode=' + mode, '_blank', 'noopener');
+    var url='capture.html?mode='+mode+'&handoff='+encodeURIComponent(handoff);
+    if(selected.length && selected.length<=120) url+='&plots='+encodeURIComponent(selected.join(','));
+    if(bounds) url+='&bounds='+encodeURIComponent([bounds.north,bounds.south,bounds.east,bounds.west].join(','));
+    window.open(url, '_blank', 'noopener');
   }
 
   function mount(){
