@@ -4,15 +4,34 @@
   window.__HAYAT_CAPTURE_LINK_LOADED = true;
 
   function listSelectedIds(){
+    var ids=[];
+    function add(value){
+      var id=String(value == null ? '' : value).trim();
+      if(id && ids.indexOf(id)===-1) ids.push(id);
+    }
+    function addPoints(list){
+      (list || []).forEach(function(p){ add(p && (p.gisPlot || p.gis || p.id)); });
+    }
     try {
-      if(typeof window.selectedList === 'function') {
-        return window.selectedList().map(function(p){ return String(p.gisPlot || ''); }).filter(Boolean);
+      if(typeof window.HAYAT_GET_SELECTED_IDS === 'function') {
+        window.HAYAT_GET_SELECTED_IDS().forEach(add);
       }
     } catch(e) {}
     try {
-      return Object.keys(window.selectedPlots || {}).filter(function(k){ return window.selectedPlots[k]; });
+      if(typeof window.selectedList === 'function') {
+        addPoints(window.selectedList());
+      }
     } catch(e) {}
-    return [];
+    try {
+      Object.keys(window.selectedPlots || {}).forEach(function(k){ if(window.selectedPlots[k]) add(k); });
+    } catch(e) {}
+    try {
+      (window.markers || []).forEach(function(item){
+        var marker=item && item.marker;
+        if(marker && marker.options && Number(marker.options.radius)>=10) add(item.point && item.point.gisPlot);
+      });
+    } catch(e) {}
+    return ids;
   }
 
   function currentBounds(){
@@ -42,7 +61,7 @@
       localStorage.setItem('JAH_CAPTURE_HANDOFF_V1', JSON.stringify({token:handoff,context:context}));
     } catch(e) {}
     var mode = selected.length ? 'selected' : 'current';
-    var url='capture.html?mode='+mode+'&handoff='+encodeURIComponent(handoff);
+    var url='capture.html?v=20260922-3&mode='+mode+'&handoff='+encodeURIComponent(handoff);
     if(selected.length && selected.length<=120) url+='&plots='+encodeURIComponent(selected.join(','));
     if(bounds) url+='&bounds='+encodeURIComponent([bounds.north,bounds.south,bounds.east,bounds.west].join(','));
     window.open(url, '_blank', 'noopener');
