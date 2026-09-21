@@ -380,7 +380,12 @@
     if(mode==='draw' && resetDraw) state.drawCrop=null;
     state.mode=mode;
     Array.prototype.slice.call(document.querySelectorAll('#captureModes button')).forEach(function(b){b.classList.toggle('active',b.dataset.mode===mode);});
-    var help={full:'Full development view.',current:'Uses the view that was open in Agent/Admin map.',selected:'Frames the plots selected in Agent/Admin map.',draw:'Drag on the preview to define a custom area.'};
+    var help={
+      full:'Shows the complete Jebel Ali Hills master plan.',
+      current:'Uses the same area and zoom that were open in the Agent/Admin map.',
+      selected:'Shows only the plots you selected and frames them automatically.',
+      draw:'Drag a rectangle on the preview to choose any area.'
+    };
     els.modeHelp.textContent=help[mode];
     var drawing=mode==='draw'&&!state.drawCrop;
     els.drawInstruction.hidden=!drawing;els.previewScroller.classList.toggle('draw-mode',drawing);
@@ -489,12 +494,17 @@
     bind();populateFilters();
     els.plotScope.value=state.scope;
     var selectedOption=els.plotScope.querySelector('option[value="selected"]');
+    var selectedModeButton=document.querySelector('#captureModes button[data-mode="selected"]');
     if(selectedIds.size) selectedOption.textContent='Selected in Agent/Admin map ('+selectedIds.size+')';
     if(!selectedIds.size){
       state.title='Jebel Ali Hills — Available Plots';
       els.documentTitle.value=state.title;
     }
-    if(!selectedIds.size) selectedOption.disabled=true;
+    if(!selectedIds.size){
+      selectedOption.disabled=true;
+      selectedModeButton.disabled=true;
+      selectedModeButton.title='Select plots in the Agent or Admin map, then open Capture Studio again.';
+    }
     if(state.mode==='selected'&&!selectedIds.size) state.mode=context.bounds?'current':'full';
     if(state.mode==='current'&&!context.bounds) state.mode='full';
     image.onload=function(){ready=true;setMode(state.mode);setTimeout(fitPreview,100);};
