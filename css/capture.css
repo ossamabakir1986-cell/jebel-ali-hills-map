@@ -26,7 +26,7 @@ button,a,input,select{outline-color:var(--gold)}
 .header-actions a{color:var(--gold-soft);text-decoration:none;border:1px solid rgba(205,168,91,.45);padding:8px 11px;border-radius:9px;font-size:12px;font-weight:700}
 .header-actions a:hover{background:rgba(255,255,255,.08)}
 
-.studio-shell{height:calc(100vh - 66px);display:grid;grid-template-columns:360px minmax(0,1fr)}
+.studio-shell{height:calc(100vh - 66px);min-height:0;display:grid;grid-template-columns:360px minmax(0,1fr)}
 .studio-controls{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:16px 16px 40px;box-shadow:8px 0 26px rgba(21,45,38,.06);z-index:5}
 .control-section{padding:15px 2px;border-bottom:1px solid #e8e3d8}
 .control-section:first-child{padding-top:3px}
@@ -58,14 +58,14 @@ input:focus,select:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(205,
 .button:disabled{opacity:.55;cursor:wait}
 .export-status{grid-column:1/-1;min-height:18px;font-size:11px;color:var(--muted);text-align:center;line-height:1.4}
 
-.preview-workspace{min-width:0;display:grid;grid-template-rows:52px minmax(0,1fr);background:radial-gradient(circle at 30% 15%,#f5f2eb,#ddd9cf)}
+.preview-workspace{min-width:0;min-height:0;overflow:hidden;display:grid;grid-template-rows:52px minmax(0,1fr);background:radial-gradient(circle at 30% 15%,#f5f2eb,#ddd9cf)}
 .preview-toolbar{display:flex;align-items:center;justify-content:space-between;padding:0 14px 0 18px;background:rgba(255,253,248,.92);border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
 .preview-toolbar strong{font-size:13px;color:var(--emerald);margin-right:8px}
 .preview-toolbar span{font-size:11px;color:var(--muted)}
 .zoom-tools{display:flex;align-items:center;gap:6px}
 .zoom-tools button{border:1px solid #d3ccbe;background:white;color:var(--emerald);border-radius:7px;min-width:30px;height:30px;font-weight:800;cursor:pointer}
 .zoom-tools input{width:120px;accent-color:var(--emerald)}
-.preview-scroller{overflow:auto;padding:22px;position:relative}
+.preview-scroller{min-width:0;min-height:0;overflow:auto;padding:22px;position:relative;overscroll-behavior:contain;scrollbar-gutter:stable both-edges;touch-action:pan-x pan-y}
 .canvas-wrap{position:relative;margin:auto;width:max-content;box-shadow:var(--shadow);background:white;transform-origin:top left}
 #previewCanvas{display:block;width:100%;height:auto;max-width:none;user-select:none;-webkit-user-drag:none}
 .draw-overlay{position:absolute;border:2px solid var(--gold);background:rgba(205,168,91,.16);pointer-events:none;box-shadow:0 0 0 99999px rgba(5,32,27,.24)}
