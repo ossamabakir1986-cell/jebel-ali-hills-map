@@ -44,8 +44,25 @@
   function statusFor(color){ return STATUS[color] || STATUS.Other; }
 
   function readContext(){
-    try { return JSON.parse(sessionStorage.getItem('JAH_CAPTURE_CONTEXT_V1') || '{}') || {}; }
-    catch(e){ return {}; }
+    var params=new URLSearchParams(location.search);
+    var token=params.get('handoff');
+    if(token){
+      try {
+        var handoff=JSON.parse(localStorage.getItem('JAH_CAPTURE_HANDOFF_V1') || '{}') || {};
+        if(handoff.token===token && handoff.context){
+          sessionStorage.setItem('JAH_CAPTURE_CONTEXT_V1',JSON.stringify(handoff.context));
+          return handoff.context;
+        }
+      } catch(e) {}
+    }
+    try {
+      var saved=JSON.parse(sessionStorage.getItem('JAH_CAPTURE_CONTEXT_V1') || '{}') || {};
+      if(saved.selected || saved.bounds) return saved;
+    } catch(e) {}
+    var selected=(params.get('plots') || '').split(',').map(clean).filter(Boolean);
+    var rawBounds=(params.get('bounds') || '').split(',').map(Number);
+    var bounds=rawBounds.length===4 && rawBounds.every(isFinite) ? {north:rawBounds[0],south:rawBounds[1],east:rawBounds[2],west:rawBounds[3]} : null;
+    return {version:1,source:'link',selected:selected,bounds:bounds};
   }
 
   function queryMode(){
@@ -152,7 +169,7 @@
   function visiblePoints(){
     var search=state.search.toLowerCase();
     var list=inventory.filter(function(p){
-      if(state.scope === 'selected' && selectedIds.size && !selectedIds.has(String(p.gisPlot))) return false;
+      if(state.scope === 'selected' && !selectedIds.has(String(p.gisPlot))) return false;
       if(state.scope === 'priced' && !p.price && !p.secondPrice) return false;
       if(search && [p.gisPlot,p.masterPlot,p.agent,p.secondAgent].map(clean).join(' ').toLowerCase().indexOf(search)===-1) return false;
       if(state.agent && clean(p.agent)!==state.agent && clean(p.secondAgent)!==state.agent) return false;
@@ -471,11 +488,13 @@
     loadInventory();
     bind();populateFilters();
     els.plotScope.value=state.scope;
+    var selectedOption=els.plotScope.querySelector('option[value="selected"]');
+    if(selectedIds.size) selectedOption.textContent='Selected in Agent/Admin map ('+selectedIds.size+')';
     if(!selectedIds.size){
       state.title='Jebel Ali Hills — Available Plots';
       els.documentTitle.value=state.title;
     }
-    if(!selectedIds.size) els.plotScope.querySelector('option[value="selected"]').disabled=true;
+    if(!selectedIds.size) selectedOption.disabled=true;
     if(state.mode==='selected'&&!selectedIds.size) state.mode=context.bounds?'current':'full';
     if(state.mode==='current'&&!context.bounds) state.mode='full';
     image.onload=function(){ready=true;setMode(state.mode);setTimeout(fitPreview,100);};
