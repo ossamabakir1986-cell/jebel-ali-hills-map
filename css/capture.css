@@ -45,6 +45,7 @@ input:focus,select:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(205,
 .segmented.four{grid-template-columns:1fr 1fr}
 .segmented button{border:0;border-radius:8px;background:transparent;color:#52645e;padding:8px 5px;font-size:11px;font-weight:800;cursor:pointer}
 .segmented button.active{background:white;color:var(--emerald);box-shadow:0 2px 8px rgba(30,55,48,.12)}
+.segmented button:disabled{opacity:.42;cursor:not-allowed}
 .check-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .check-grid label,.switch-row{font-size:12px;color:#344a44;display:flex;align-items:center;gap:7px;min-height:25px}
 .check-grid input,.switch-row input{accent-color:var(--emerald)}
