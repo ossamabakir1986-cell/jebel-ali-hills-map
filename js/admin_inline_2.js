@@ -1,3 +1,37 @@
+  // Current light-base cleanup: permanently remove retired Arabic / Guide / What Changed UI.
+  (function(){
+    try {
+      var selectors = [
+        '#hayat-v3343-tools','.hayat-v3343-tools',
+        '#hayat-v3347-toolbar',
+        '#hayat-v3349-fixed-tools',
+        '#hayat-v3350-toolbar',
+        '#hayat-v3353-toolbar',
+        '#hayat-v3354-toolbar',
+        '#hayat-v3343-panel','#hayat-v3344-panel',
+        '#hayat-v3346-fallback-panel',
+        '#hayat-v3349-overlay','#hayat-v3349-box',
+        '#hayat-v3350-panel','#hayat-v3353-panel','#hayat-v3354-panel'
+      ];
+      selectors.forEach(function(sel){
+        Array.prototype.slice.call(document.querySelectorAll(sel)).forEach(function(el){
+          try { el.remove(); } catch(e) { if(el.parentNode) el.parentNode.removeChild(el); }
+        });
+      });
+      [
+        'hayat-v3343-style','hayat-v3344-style','hayat-v3346-mobile-tools-style',
+        'hayat-v3347-style','hayat-v3349-style','hayat-v3350-style',
+        'hayat-v3351-small-tools-style','hayat-v3353-style','hayat-v3354-css'
+      ].forEach(function(id){
+        var el=document.getElementById(id); if(el) el.remove();
+      });
+      document.documentElement.classList.remove('hayat-ar');
+      document.documentElement.lang='en';
+      document.documentElement.dir='ltr';
+      try { localStorage.removeItem('HAYAT_UI_LANGUAGE'); } catch(e) {}
+    } catch(e) {}
+  })();
+
   setTimeout(function(){
     if(window.addCrispMasterPlanLabels) addCrispMasterPlanLabels();
   }, 500);
