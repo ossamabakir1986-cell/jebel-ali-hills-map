@@ -306,3 +306,12 @@
   setTimeout(boot, 1600);
   window.HAYAT_V3333_REFRESH_OPEN_POPUP = refreshLabelsAndOpenPopup;
 })();
+
+(function(){
+  if(window.__HAYAT_CAPTURE_LINK_BOOTSTRAPPED) return;
+  window.__HAYAT_CAPTURE_LINK_BOOTSTRAPPED = true;
+  var script = document.createElement('script');
+  script.src = 'js/capture_link.js';
+  script.defer = true;
+  document.head.appendChild(script);
+})();
