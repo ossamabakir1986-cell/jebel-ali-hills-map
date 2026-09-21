@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hayat Capture Studio — Jebel Ali Hills</title>
+  <link rel="stylesheet" href="css/capture.css">
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <header class="studio-header">
+    <div class="brand-lockup">
+      <div class="brand-mark" aria-hidden="true">H</div>
+      <div>
+        <strong>Hayat Luxury Properties</strong>
+        <span>Jebel Ali Hills · Capture Studio</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a href="agent.html">Agent Map</a>
+      <a href="admin.html">Admin Map</a>
+    </div>
+  </header>
+
+  <main class="studio-shell">
+    <aside class="studio-controls" aria-label="Capture controls">
+      <section class="control-section intro-card">
+        <span class="eyebrow">Read-only presentation page</span>
+        <h1>Create a client map</h1>
+        <p>Choose the plots and details. Nothing changed here can edit the live inventory.</p>
+      </section>
+
+      <section class="control-section">
+        <h2>1. Capture area</h2>
+        <div class="segmented four" id="captureModes">
+          <button type="button" data-mode="full">Full map</button>
+          <button type="button" data-mode="current">Map view</button>
+          <button type="button" data-mode="selected">Selected</button>
+          <button type="button" data-mode="draw">Draw area</button>
+        </div>
+        <p class="control-note" id="modeHelp">Full development view.</p>
+      </section>
+
+      <section class="control-section">
+        <h2>2. Plots shown</h2>
+        <label class="field-label" for="plotScope">Inventory scope</label>
+        <select id="plotScope">
+          <option value="selected">Selected in Agent/Admin map</option>
+          <option value="priced">Priced plots only</option>
+          <option value="all">All inventory plots</option>
+        </select>
+        <input id="plotSearch" type="search" placeholder="Search GIS, master plan or agent">
+        <div class="filter-grid">
+          <select id="agentFilter"><option value="">All agents</option></select>
+          <select id="phaseFilter"><option value="">All phases</option></select>
+          <select id="statusFilter">
+            <option value="">All statuses</option>
+            <option value="Red">Direct</option>
+            <option value="Pink">On hold</option>
+            <option value="Blue">Through broker</option>
+          </select>
+          <select id="pricingFilter">
+            <option value="">All pricing</option>
+            <option value="priced">Priced only</option>
+            <option value="unpriced">Unpriced only</option>
+          </select>
+        </div>
+        <div class="summary-pill" id="plotSummary">Loading inventory…</div>
+      </section>
+
+      <section class="control-section">
+        <h2>3. Label details</h2>
+        <div class="check-grid" id="labelFields">
+          <label><input type="checkbox" value="price" checked> Price / sqft</label>
+          <label><input type="checkbox" value="master" checked> Master Plan</label>
+          <label><input type="checkbox" value="gis"> GIS number</label>
+          <label><input type="checkbox" value="size" checked> Size</label>
+          <label><input type="checkbox" value="agent"> Agent</label>
+          <label><input type="checkbox" value="features"> Features</label>
+          <label><input type="checkbox" value="updated"> Last updated</label>
+        </div>
+        <div class="switch-list">
+          <label class="switch-row"><input id="avoidOverlap" type="checkbox" checked><span>Avoid overlapping labels</span></label>
+          <label class="switch-row"><input id="showLeaderLines" type="checkbox" checked><span>Leader lines for moved labels</span></label>
+          <label class="switch-row"><input id="showDots" type="checkbox" checked><span>Show exact plot dots</span></label>
+          <label class="switch-row"><input id="showLegend" type="checkbox" checked><span>Show status legend</span></label>
+        </div>
+      </section>
+
+      <section class="control-section">
+        <h2>4. Client presentation</h2>
+        <label class="field-label" for="documentTitle">Heading</label>
+        <input id="documentTitle" value="Jebel Ali Hills — Selected Plots">
+        <label class="field-label" for="documentSubtitle">Optional subtitle</label>
+        <input id="documentSubtitle" placeholder="Example: Plots proposed for Mr. Ahmed">
+        <label class="field-label" for="quality">Export quality</label>
+        <select id="quality">
+          <option value="1920">HD · 1920 px</option>
+          <option value="3840" selected>4K · 3840 px</option>
+          <option value="7680">8K · 7680 px</option>
+        </select>
+        <p class="control-note">8K gives the deepest zoom but uses more memory and may take longer.</p>
+      </section>
+
+      <section class="export-actions">
+        <button id="refreshPreview" type="button" class="button secondary">Refresh preview</button>
+        <button id="downloadPng" type="button" class="button primary">Download PNG</button>
+        <button id="downloadPdf" type="button" class="button primary outline">Download PDF</button>
+        <div id="exportStatus" class="export-status" role="status"></div>
+      </section>
+    </aside>
+
+    <section class="preview-workspace">
+      <div class="preview-toolbar">
+        <div>
+          <strong>Preview</strong>
+          <span id="previewMeta">Preparing map…</span>
+        </div>
+        <div class="zoom-tools">
+          <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
+          <input id="previewZoom" type="range" min="35" max="180" value="72" aria-label="Preview zoom">
+          <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
+          <button id="fitPreview" type="button">Fit</button>
+        </div>
+      </div>
+      <div class="preview-scroller" id="previewScroller">
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="previewCanvas" aria-label="Client map preview"></canvas>
+          <div id="drawOverlay" class="draw-overlay" hidden></div>
+        </div>
+      </div>
+      <div class="draw-instruction" id="drawInstruction" hidden>Drag across the preview to choose the capture area. Press Esc to cancel.</div>
+    </section>
+  </main>
+
+  <script src="js/agent_inventory_data.js"></script>
+  <script src="js/published_inventory_data.js"></script>
+  <script src="js/data_normalize.js"></script>
+  <script src="js/v3342_data_update_2026_09_10.js"></script>
+  <script src="js/v3355_pa14_223_224_master_swap_fix.js"></script>
+  <script src="js/v3356_data_update_2026_09_20.js"></script>
+  <script src="js/capture.js"></script>
+</body>
+</html>
