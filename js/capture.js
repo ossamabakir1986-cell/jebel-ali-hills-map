@@ -22,6 +22,9 @@
   var renderMeta = null;
   var renderTimer = null;
   var panStart = null;
+  var labelDrag = null;
+  var labelDragFrame = null;
+  var manualLabelOffsets = new Map();
   var ready = false;
   var state = {
     mode:queryMode(),
@@ -45,6 +48,7 @@
   function clean(v){ return String(v == null ? '' : v).replace(/\s+/g,' ').trim(); }
   function unique(list){ return Array.from(new Set(list.filter(Boolean))); }
   function statusFor(color){ return STATUS[color] || STATUS.Other; }
+  function pointKey(p){ return clean(p&&p.gisPlot)||[clean(p&&p.masterPlot),Number(p&&p.lat).toFixed(6),Number(p&&p.lon).toFixed(6)].join('|'); }
 
   function readContext(){
     var params=new URLSearchParams(location.search);
@@ -277,12 +281,14 @@
     });
   }
 
-  function placeLabels(ctx,items,fontSize,mapRect){
+  function placeLabels(ctx,items,fontSize,mapRect,crop){
     var occupied=[];
     items.sort(function(a,b){
+      var am=manualLabelOffsets.has(pointKey(a.point))?0:1;
+      var bm=manualLabelOffsets.has(pointKey(b.point))?0:1;
       var ap=selectedIds.has(String(a.point.gisPlot))?0:1;
       var bp=selectedIds.has(String(b.point.gisPlot))?0:1;
-      return ap-bp || a.anchor.y-b.anchor.y;
+      return am-bm || ap-bp || a.anchor.y-b.anchor.y;
     });
     items.forEach(function(item){
       ctx.font='600 '+fontSize+'px Arial, sans-serif';
@@ -292,7 +298,14 @@
       var h=item.lines.length*lineH+padY*2;
       var options=candidates(item.anchor,w,h,fontSize,mapRect);
       var chosen=options[0];
-      if(state.avoidOverlap){
+      var manual=manualLabelOffsets.get(pointKey(item.point));
+      if(manual){
+        chosen={
+          x:clamp(item.anchor.x+(manual.dx/crop.w)*mapRect.w,mapRect.x+3,mapRect.x+mapRect.w-w-3),
+          y:clamp(item.anchor.y+(manual.dy/crop.h)*mapRect.h,mapRect.y+3,mapRect.y+mapRect.h-h-3),
+          w:w,h:h,index:-1
+        };
+      } else if(state.avoidOverlap){
         var clear=options.find(function(r){return !occupied.some(function(o){return rectOverlap(r,o,fontSize*.18);});});
         if(clear) chosen=clear;
         else {
@@ -306,6 +319,7 @@
       item.box=chosen;
       item.box.lineH=lineH;item.box.padX=padX;item.box.padY=padY;
       item.moved=chosen.index!==0;
+      item.manual=!!manual;
       occupied.push(chosen);
     });
     return items;
@@ -374,7 +388,7 @@
       var source=geoToImage(p.lat,p.lon);
       return {point:p,lines:labelLines(p),anchor:{x:mapRect.x+(source.x-crop.x)/crop.w*mapRect.w,y:mapRect.y+(source.y-crop.y)/crop.h*mapRect.h}};
     });
-    placeLabels(ctx,items,fontSize,mapRect);
+    placeLabels(ctx,items,fontSize,mapRect,crop);
 
     ctx.save();
     items.forEach(function(item){
@@ -407,7 +421,7 @@
     ctx.textAlign='right';ctx.fillText('Prepared '+today+' · Hayat Luxury GIS',width-width*.03,headerH+mapH+footerH/2);ctx.textAlign='left';
     if(state.showLegend) drawLegend(ctx,width,headerH,mapH,footerH);
 
-    renderMeta={crop:crop,mapRect:mapRect,width:width,height:totalH,count:list.length};
+    renderMeta={crop:crop,mapRect:mapRect,width:width,height:totalH,count:list.length,items:items};
     return renderMeta;
   }
 
@@ -488,7 +502,7 @@
   }
 
   function startPan(e){
-    if(state.mode==='draw' || e.button!==0) return;
+    if(state.mode==='draw' || labelDrag || e.button!==0) return;
     panStart={x:e.clientX,y:e.clientY,left:els.previewScroller.scrollLeft,top:els.previewScroller.scrollTop,id:e.pointerId};
     els.previewScroller.classList.add('dragging');
     els.previewScroller.setPointerCapture&&els.previewScroller.setPointerCapture(e.pointerId);
@@ -496,7 +510,7 @@
   }
 
   function movePan(e){
-    if(!panStart || (panStart.id!=null && e.pointerId!==panStart.id)) return;
+    if(labelDrag || !panStart || (panStart.id!=null && e.pointerId!==panStart.id)) return;
     els.previewScroller.scrollLeft=panStart.left-(e.clientX-panStart.x);
     els.previewScroller.scrollTop=panStart.top-(e.clientY-panStart.y);
   }
@@ -526,12 +540,19 @@
     $('downloadPng').addEventListener('click',function(){exportFile('png');});
     $('downloadPdf').addEventListener('click',function(){exportFile('pdf');});
     $('downloadExcel').addEventListener('click',exportExcel);
+    $('resetLabelPositions').addEventListener('click',function(){manualLabelOffsets.clear();els.exportStatus.textContent='Badge positions reset to automatic layout.';schedulePreview();});
     els.previewScroller.addEventListener('wheel',wheelZoom,{passive:false});
     els.previewScroller.addEventListener('pointerdown',startPan);
     window.addEventListener('pointermove',movePan);
     window.addEventListener('pointerup',finishPan);
     window.addEventListener('pointercancel',finishPan);
+    els.previewCanvas.addEventListener('pointerdown',startLabelDrag);
     els.previewCanvas.addEventListener('pointerdown',startDraw);
+    els.previewCanvas.addEventListener('pointermove',updateBadgeHover);
+    els.previewCanvas.addEventListener('pointerleave',function(){if(!labelDrag)els.previewScroller.classList.remove('badge-hover');});
+    window.addEventListener('pointermove',moveLabelDrag);
+    window.addEventListener('pointerup',finishLabelDrag);
+    window.addEventListener('pointercancel',finishLabelDrag);
     window.addEventListener('pointermove',moveDraw);
     window.addEventListener('pointerup',finishDraw);
     window.addEventListener('keydown',function(e){if(e.key==='Escape')cancelDraw();});
@@ -541,6 +562,50 @@
   function pointerCanvasPosition(e){
     var r=els.previewCanvas.getBoundingClientRect();
     return {x:(e.clientX-r.left)*(els.previewCanvas.width/r.width),y:(e.clientY-r.top)*(els.previewCanvas.height/r.height),cssX:e.clientX-r.left,cssY:e.clientY-r.top};
+  }
+
+  function labelAtPosition(p){
+    var items=renderMeta&&renderMeta.items||[];
+    for(var i=items.length-1;i>=0;i--){
+      var b=items[i].box;
+      if(b&&p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h) return items[i];
+    }
+    return null;
+  }
+
+  function updateBadgeHover(e){
+    if(state.mode==='draw'||labelDrag) return;
+    els.previewScroller.classList.toggle('badge-hover',!!labelAtPosition(pointerCanvasPosition(e)));
+  }
+
+  function startLabelDrag(e){
+    if(state.mode==='draw'||e.button!==0||!renderMeta) return;
+    var p=pointerCanvasPosition(e),item=labelAtPosition(p);
+    if(!item) return;
+    labelDrag={key:pointKey(item.point),id:e.pointerId,offsetX:p.x-item.box.x,offsetY:p.y-item.box.y};
+    panStart=null;els.previewScroller.classList.remove('dragging','badge-hover');els.previewScroller.classList.add('badge-dragging');
+    els.previewCanvas.setPointerCapture&&els.previewCanvas.setPointerCapture(e.pointerId);
+    e.preventDefault();e.stopPropagation();
+  }
+
+  function moveLabelDrag(e){
+    if(!labelDrag||(labelDrag.id!=null&&e.pointerId!==labelDrag.id)||!renderMeta) return;
+    var item=(renderMeta.items||[]).find(function(x){return pointKey(x.point)===labelDrag.key;});
+    if(!item) return;
+    var p=pointerCanvasPosition(e),m=renderMeta.mapRect,crop=renderMeta.crop,b=item.box;
+    var x=clamp(p.x-labelDrag.offsetX,m.x+3,m.x+m.w-b.w-3);
+    var y=clamp(p.y-labelDrag.offsetY,m.y+3,m.y+m.h-b.h-3);
+    manualLabelOffsets.set(labelDrag.key,{dx:(x-item.anchor.x)/m.w*crop.w,dy:(y-item.anchor.y)/m.h*crop.h});
+    if(!labelDragFrame){
+      labelDragFrame=requestAnimationFrame(function(){labelDragFrame=null;renderPreview();});
+    }
+    e.preventDefault();
+  }
+
+  function finishLabelDrag(e){
+    if(!labelDrag||(e.pointerId!=null&&labelDrag.id!=null&&e.pointerId!==labelDrag.id)) return;
+    labelDrag=null;els.previewScroller.classList.remove('badge-dragging');
+    els.exportStatus.textContent='Badge position saved for this capture and its exports.';
   }
 
   function startDraw(e){
