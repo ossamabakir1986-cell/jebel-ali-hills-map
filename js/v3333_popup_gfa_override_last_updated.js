@@ -337,7 +337,7 @@
     return ids;
   };
   var script = document.createElement('script');
-  script.src = 'js/capture_link.js?v=20260922-4';
+  script.src = 'js/capture_link.js?v=20260922-5';
   script.defer = true;
   document.head.appendChild(script);
 })();
