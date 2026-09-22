@@ -4,8 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hayat Capture Studio — Jebel Ali Hills</title>
-  <link rel="stylesheet" href="css/capture.css">
+  <link rel="stylesheet" href="css/capture.css?v=20260922-4">
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 </head>
 <body>
   <header class="studio-header">
@@ -32,9 +33,10 @@
 
       <section class="control-section">
         <h2>1. Capture area</h2>
-        <div class="segmented four" id="captureModes">
+        <div class="segmented capture-mode-grid" id="captureModes">
           <button type="button" data-mode="full">Whole master plan</button>
           <button type="button" data-mode="current">Current map view</button>
+          <button type="button" data-mode="filtered">Filtered results</button>
           <button type="button" data-mode="selected">Selected plots</button>
           <button type="button" data-mode="draw">Draw area</button>
         </div>
@@ -46,6 +48,7 @@
         <label class="field-label" for="plotScope">Inventory scope</label>
         <select id="plotScope">
           <option value="selected">Selected in Agent/Admin map</option>
+          <option value="filtered">Filtered in Agent/Admin map</option>
           <option value="priced">Priced plots only</option>
           <option value="all">All inventory plots</option>
         </select>
@@ -76,14 +79,26 @@
           <label><input type="checkbox" value="gis"> GIS number</label>
           <label><input type="checkbox" value="size" checked> Size</label>
           <label><input type="checkbox" value="agent"> Agent</label>
+          <label><input type="checkbox" value="mobile"> Mobile</label>
+          <label><input type="checkbox" value="total"> Total price</label>
+          <label><input type="checkbox" value="deposit"> Deposit cheque</label>
+          <label><input type="checkbox" value="commission"> Commission</label>
+          <label><input type="checkbox" value="secondOffer"> Second offer</label>
+          <label><input type="checkbox" value="type"> Type</label>
+          <label><input type="checkbox" value="phase"> Phase</label>
+          <label><input type="checkbox" value="gfa"> GFA / allowed</label>
           <label><input type="checkbox" value="features"> Features</label>
+          <label><input type="checkbox" value="comment"> Comment</label>
+          <label><input type="checkbox" value="coordinates"> Coordinates</label>
+          <label><input type="checkbox" value="status"> Status</label>
           <label><input type="checkbox" value="updated"> Last updated</label>
         </div>
         <div class="switch-list">
           <label class="switch-row"><input id="avoidOverlap" type="checkbox" checked><span>Avoid overlapping labels</span></label>
-          <label class="switch-row"><input id="showLeaderLines" type="checkbox" checked><span>Leader lines for moved labels</span></label>
+          <label class="switch-row"><input id="showLeaderLines" type="checkbox" checked disabled><span>Always connect labels to plots</span></label>
           <label class="switch-row"><input id="showDots" type="checkbox" checked><span>Show exact plot dots</span></label>
           <label class="switch-row"><input id="showLegend" type="checkbox" checked><span>Show status legend</span></label>
+          <label class="switch-row"><input id="showWatermark" type="checkbox" checked><span>Transparent Hayat watermark</span></label>
         </div>
       </section>
 
@@ -100,12 +115,15 @@
           <option value="7680">8K · 7680 px</option>
         </select>
         <p class="control-note">8K gives the deepest zoom but uses more memory and may take longer.</p>
+        <label class="switch-row excel-switch"><input id="includeExcel" type="checkbox" checked><span>Download Excel data with PNG/PDF</span></label>
+        <p class="control-note">Excel includes both offers, total price, deposit cheque, commission, GFA and contact details.</p>
       </section>
 
       <section class="export-actions">
         <button id="refreshPreview" type="button" class="button secondary">Refresh preview</button>
         <button id="downloadPng" type="button" class="button primary">Download PNG</button>
         <button id="downloadPdf" type="button" class="button primary outline">Download PDF</button>
+        <button id="downloadExcel" type="button" class="button excel-button">Download Excel only</button>
         <div id="exportStatus" class="export-status" role="status"></div>
       </section>
     </aside>
@@ -123,7 +141,7 @@
           <button id="fitPreview" type="button">Fit</button>
         </div>
       </div>
-      <div class="preview-scroller" id="previewScroller" tabindex="0" aria-label="Scrollable client map preview">
+      <div class="preview-scroller" id="previewScroller" tabindex="0" aria-label="Client map preview. Drag to pan and use the mouse wheel to zoom.">
         <div class="canvas-wrap" id="canvasWrap">
           <canvas id="previewCanvas" aria-label="Client map preview"></canvas>
           <div id="drawOverlay" class="draw-overlay" hidden></div>
@@ -139,6 +157,6 @@
   <script src="js/v3342_data_update_2026_09_10.js"></script>
   <script src="js/v3355_pa14_223_224_master_swap_fix.js"></script>
   <script src="js/v3356_data_update_2026_09_20.js"></script>
-  <script src="js/capture.js?v=20260922-3"></script>
+  <script src="js/capture.js?v=20260922-4"></script>
 </body>
 </html>
