@@ -79,7 +79,7 @@
       localStorage.setItem('JAH_CAPTURE_HANDOFF_V1', JSON.stringify({token:handoff,context:context}));
     } catch(e) {}
     var mode = selected.length ? 'selected' : (filteredActive ? 'filtered' : 'current');
-    var url='capture.html?v=20260922-4&mode='+mode+'&handoff='+encodeURIComponent(handoff);
+    var url='capture.html?v=20260922-5&mode='+mode+'&handoff='+encodeURIComponent(handoff);
     if(selected.length && selected.length<=120) url+='&plots='+encodeURIComponent(selected.join(','));
     if(!selected.length && filteredActive && filtered.length<=120) url+='&filtered='+encodeURIComponent(filtered.join(','));
     if(bounds) url+='&bounds='+encodeURIComponent([bounds.north,bounds.south,bounds.east,bounds.west].join(','));
