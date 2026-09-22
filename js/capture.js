@@ -6,20 +6,22 @@
   var PREVIEW_W = 1680;
   var SOURCE_IMAGE = 'assets/jah_master_plan_hd.png';
   var STATUS = {
-    Red:{name:'Direct', dot:'#d43b36', fill:'#fff6f3', border:'#d43b36'},
-    Pink:{name:'On hold', dot:'#e55b94', fill:'#fff4f8', border:'#d94b87'},
-    Blue:{name:'Through broker', dot:'#267bc2', fill:'#f1f7fd', border:'#267bc2'},
-    Other:{name:'Other', dot:'#5c6b66', fill:'#f4f6f5', border:'#5c6b66'}
+    Red:{name:'Direct', dot:'#b91c1c', fill:'#fee2e2', border:'#991b1b'},
+    Pink:{name:'On hold', dot:'#db2777', fill:'#fce7f3', border:'#be185d'},
+    Blue:{name:'Through broker', dot:'#0369a1', fill:'#dbeafe', border:'#075985'},
+    Other:{name:'Other', dot:'#374151', fill:'#e5e7eb', border:'#1f2937'}
   };
 
   var context = readContext();
   var selectedIds = new Set((context.selected || []).map(String));
+  var filteredIds = new Set((context.filtered || []).map(String));
   var image = new Image();
   var inventory = [];
   var drawStart = null;
   var drawBox = null;
   var renderMeta = null;
   var renderTimer = null;
+  var panStart = null;
   var ready = false;
   var state = {
     mode:queryMode(),
@@ -29,7 +31,8 @@
     showLeaderLines:true,
     showDots:true,
     showLegend:true,
-    scope:selectedIds.size ? 'selected' : 'priced',
+    showWatermark:true,
+    scope:selectedIds.size ? 'selected' : (filteredIds.size ? 'filtered' : 'priced'),
     search:'', agent:'', phase:'', status:'', pricing:'',
     title:'Jebel Ali Hills — Selected Plots',
     subtitle:''
@@ -57,17 +60,18 @@
     }
     try {
       var saved=JSON.parse(sessionStorage.getItem('JAH_CAPTURE_CONTEXT_V1') || '{}') || {};
-      if(saved.selected || saved.bounds) return saved;
+      if(saved.selected || saved.filtered || saved.bounds) return saved;
     } catch(e) {}
     var selected=(params.get('plots') || '').split(',').map(clean).filter(Boolean);
+    var filtered=(params.get('filtered') || '').split(',').map(clean).filter(Boolean);
     var rawBounds=(params.get('bounds') || '').split(',').map(Number);
     var bounds=rawBounds.length===4 && rawBounds.every(isFinite) ? {north:rawBounds[0],south:rawBounds[1],east:rawBounds[2],west:rawBounds[3]} : null;
-    return {version:1,source:'link',selected:selected,bounds:bounds};
+    return {version:1,source:'link',selected:selected,filtered:filtered,bounds:bounds};
   }
 
   function queryMode(){
     var mode = new URLSearchParams(location.search).get('mode') || '';
-    if(['full','current','selected','draw'].indexOf(mode) === -1) mode = 'full';
+    if(['full','current','filtered','selected','draw'].indexOf(mode) === -1) mode = 'full';
     return mode;
   }
 
@@ -129,7 +133,16 @@
 
   function currentCrop(){
     if(state.mode === 'draw' && state.drawCrop) return normalizedCrop(state.drawCrop);
+    if(state.phase) {
+      var phasePlots=inventory.filter(function(p){return clean(p.phase)===state.phase;});
+      var phaseCrop=cropAroundPoints(phasePlots);
+      if(phaseCrop) return phaseCrop;
+    }
     if(state.mode === 'current') return cropFromBounds(context.bounds) || fullCrop();
+    if(state.mode === 'filtered') {
+      var filtered=inventory.filter(function(p){return filteredIds.has(String(p.gisPlot));});
+      return cropAroundPoints(filtered) || cropFromBounds(context.bounds) || fullCrop();
+    }
     if(state.mode === 'selected') {
       var selected=inventory.filter(function(p){return selectedIds.has(String(p.gisPlot));});
       return cropAroundPoints(selected) || cropFromBounds(context.bounds) || fullCrop();
@@ -170,6 +183,7 @@
     var search=state.search.toLowerCase();
     var list=inventory.filter(function(p){
       if(state.scope === 'selected' && !selectedIds.has(String(p.gisPlot))) return false;
+      if(state.scope === 'filtered' && !filteredIds.has(String(p.gisPlot))) return false;
       if(state.scope === 'priced' && !p.price && !p.secondPrice) return false;
       if(search && [p.gisPlot,p.masterPlot,p.agent,p.secondAgent].map(clean).join(' ').toLowerCase().indexOf(search)===-1) return false;
       if(state.agent && clean(p.agent)!==state.agent && clean(p.secondAgent)!==state.agent) return false;
@@ -198,8 +212,40 @@
     if(state.fields.has('master') && p.masterPlot) lines.push(clean(p.masterPlot).replace(/-/g,'_'));
     if(state.fields.has('gis') && p.gisPlot) lines.push('GIS '+clean(p.gisPlot));
     if(state.fields.has('size') && (p.sizeText || p.size)) lines.push(clean(p.sizeText || Number(p.size).toLocaleString())+' sqft');
-    if(state.fields.has('agent') && (p.agent || p.secondAgent)) lines.push(clean(p.agent || p.secondAgent));
+    if(state.fields.has('total')) {
+      if(p.totalText || p.total) lines.push('Total AED '+clean(p.totalText || Math.round(p.total).toLocaleString()));
+      if((p.secondTotalText || p.secondTotal) && !state.fields.has('secondOffer')) lines.push('Total 2 AED '+clean(p.secondTotalText || Math.round(p.secondTotal).toLocaleString()));
+    }
+    if(state.fields.has('deposit')) {
+      if(p.depositText || p.deposit) lines.push('Deposit AED '+clean(p.depositText || Math.round(p.deposit).toLocaleString()));
+      if((p.secondDepositText || p.secondDeposit) && !state.fields.has('secondOffer')) lines.push('Deposit 2 AED '+clean(p.secondDepositText || Math.round(p.secondDeposit).toLocaleString()));
+    }
+    if(state.fields.has('commission')) {
+      if(p.commissionText || p.commission) lines.push('Commission AED '+clean(p.commissionText || Math.round(p.commission).toLocaleString()));
+      if((p.secondCommissionText || p.secondCommission) && !state.fields.has('secondOffer')) lines.push('Commission 2 AED '+clean(p.secondCommissionText || Math.round(p.secondCommission).toLocaleString()));
+    }
+    if(state.fields.has('agent') && p.agent) lines.push('Agent '+clean(p.agent));
+    if(state.fields.has('mobile') && p.mobile) lines.push(clean(p.mobile));
+    if(state.fields.has('secondOffer') && (p.secondAgent || p.secondPrice || p.secondMobile)) {
+      var offer='Offer 2';
+      if(p.secondPriceText || p.secondPrice) offer+=' · AED '+clean(p.secondPriceText || Math.round(p.secondPrice))+'/sqft';
+      lines.push(offer);
+      if(p.secondAgent) lines.push('Agent 2 '+clean(p.secondAgent));
+      if(state.fields.has('mobile') && p.secondMobile) lines.push(clean(p.secondMobile));
+      if(state.fields.has('total') && (p.secondTotalText || p.secondTotal)) lines.push('Total 2 AED '+clean(p.secondTotalText || Math.round(p.secondTotal).toLocaleString()));
+      if(state.fields.has('deposit') && (p.secondDepositText || p.secondDeposit)) lines.push('Deposit 2 AED '+clean(p.secondDepositText || Math.round(p.secondDeposit).toLocaleString()));
+      if(state.fields.has('commission') && (p.secondCommissionText || p.secondCommission)) lines.push('Commission 2 AED '+clean(p.secondCommissionText || Math.round(p.secondCommission).toLocaleString()));
+    }
+    if(state.fields.has('type') && p.type) lines.push('Type '+clean(p.type));
+    if(state.fields.has('phase') && p.phase) lines.push('Phase '+clean(p.phase));
+    if(state.fields.has('gfa')) {
+      if(p.gfa) lines.push('GFA '+clean(p.gfa));
+      if(p.gfaAllowedText || p.gfaAllowed) lines.push('Allowed '+clean(p.gfaAllowedText || Math.round(p.gfaAllowed).toLocaleString())+' sqft'+(p.gfaPct?' ('+clean(p.gfaPct)+'%)':''));
+    }
     if(state.fields.has('features') && p.features) lines.push(clean(p.features));
+    if(state.fields.has('comment') && p.comment) lines.push('Comment '+clean(p.comment));
+    if(state.fields.has('coordinates') && p.coords) lines.push(clean(p.coords));
+    if(state.fields.has('status')) lines.push('Status '+statusFor(p.color).name);
     if(state.fields.has('updated') && (p.lastUpdated || p.lastDateUpdated)) lines.push('Updated '+clean(p.lastUpdated || p.lastDateUpdated));
     if(!lines.length) lines.push(clean(p.masterPlot || p.gisPlot));
     return lines;
@@ -271,7 +317,27 @@
   }
 
   function nearestBoxPoint(anchor,box){
-    return {x:clamp(anchor.x,box.x,box.x+box.w),y:clamp(anchor.y,box.y,box.y+box.h)};
+    var x=clamp(anchor.x,box.x,box.x+box.w),y=clamp(anchor.y,box.y,box.y+box.h);
+    if(anchor.x>=box.x&&anchor.x<=box.x+box.w&&anchor.y>=box.y&&anchor.y<=box.y+box.h){
+      var edges=[{d:anchor.x-box.x,x:box.x,y:anchor.y},{d:box.x+box.w-anchor.x,x:box.x+box.w,y:anchor.y},{d:anchor.y-box.y,x:anchor.x,y:box.y},{d:box.y+box.h-anchor.y,x:anchor.x,y:box.y+box.h}];
+      edges.sort(function(a,b){return a.d-b.d;});x=edges[0].x;y=edges[0].y;
+    }
+    return {x:x,y:y};
+  }
+
+  function drawWatermark(ctx,mapRect,width){
+    if(!state.showWatermark) return;
+    var text='HAYAT LUXURY PROPERTIES';
+    var font=Math.max(18,Math.round(width*.018));
+    var stepX=Math.max(310,width*.24),stepY=Math.max(155,width*.12);
+    ctx.save();
+    ctx.beginPath();ctx.rect(mapRect.x,mapRect.y,mapRect.w,mapRect.h);ctx.clip();
+    ctx.translate(mapRect.x,mapRect.y);ctx.rotate(-Math.PI/9);
+    ctx.font='700 '+font+'px Arial, sans-serif';ctx.fillStyle='rgba(78,84,82,.13)';ctx.textAlign='center';ctx.textBaseline='middle';
+    for(var y=-mapRect.h;y<mapRect.h*1.8;y+=stepY){
+      for(var x=-mapRect.w;x<mapRect.w*1.8;x+=stepX){ctx.fillText(text,x,y);}
+    }
+    ctx.restore();
   }
 
   function renderToCanvas(canvas,width){
@@ -298,11 +364,12 @@
 
     var mapRect={x:0,y:headerH,w:width,h:mapH};
     ctx.drawImage(image,crop.x,crop.y,crop.w,crop.h,mapRect.x,mapRect.y,mapRect.w,mapRect.h);
+    drawWatermark(ctx,mapRect,width);
 
     var list=visiblePoints();
     var labelDivisor=list.length>300?330:(list.length>180?275:(list.length>80?225:(list.length>30?180:145)));
     var fontSize=Math.max(width/labelDivisor,width/340);
-    var dotR=Math.max(4,width/470);
+    var dotR=Math.max(5,width/420);
     var items=list.map(function(p){
       var source=geoToImage(p.lat,p.lon);
       return {point:p,lines:labelLines(p),anchor:{x:mapRect.x+(source.x-crop.x)/crop.w*mapRect.w,y:mapRect.y+(source.y-crop.y)/crop.h*mapRect.h}};
@@ -311,21 +378,20 @@
 
     ctx.save();
     items.forEach(function(item){
-      if(item.moved && state.showLeaderLines){
-        var end=nearestBoxPoint(item.anchor,item.box);
-        ctx.strokeStyle='rgba(7,47,40,.68)';ctx.lineWidth=Math.max(1,width/1900);ctx.beginPath();ctx.moveTo(item.anchor.x,item.anchor.y);ctx.lineTo(end.x,end.y);ctx.stroke();
-      }
+      var end=nearestBoxPoint(item.anchor,item.box);
+      ctx.strokeStyle='rgba(4,47,40,.88)';ctx.lineWidth=Math.max(1.4,width/1500);ctx.beginPath();ctx.moveTo(item.anchor.x,item.anchor.y);ctx.lineTo(end.x,end.y);ctx.stroke();
     });
     items.forEach(function(item){
       var s=statusFor(item.point.color);
       if(state.showDots){
-        ctx.fillStyle=s.dot;ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(1.5,width/1300);ctx.beginPath();ctx.arc(item.anchor.x,item.anchor.y,dotR,0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(item.anchor.x,item.anchor.y,dotR*1.45,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle=s.dot;ctx.strokeStyle=s.border;ctx.lineWidth=Math.max(1.5,width/1300);ctx.beginPath();ctx.arc(item.anchor.x,item.anchor.y,dotR,0,Math.PI*2);ctx.fill();ctx.stroke();
       }
     });
     items.forEach(function(item){
       var b=item.box,s=statusFor(item.point.color);
       ctx.shadowColor='rgba(5,35,29,.18)';ctx.shadowBlur=fontSize*.55;ctx.shadowOffsetY=fontSize*.16;
-      roundedRect(ctx,b.x,b.y,b.w,b.h,fontSize*.45);ctx.fillStyle=s.fill;ctx.fill();ctx.shadowColor='transparent';ctx.strokeStyle=s.border;ctx.lineWidth=Math.max(1,width/1700);ctx.stroke();
+      roundedRect(ctx,b.x,b.y,b.w,b.h,fontSize*.45);ctx.fillStyle=s.fill;ctx.fill();ctx.shadowColor='transparent';ctx.strokeStyle=s.border;ctx.lineWidth=Math.max(1.5,width/1450);ctx.stroke();
       item.lines.forEach(function(line,i){
         ctx.fillStyle=i===0&&state.fields.has('price')?'#062f28':'#354d46';
         ctx.font=(i===0?'700 ':'600 ')+fontSize+'px Arial, sans-serif';
@@ -370,12 +436,13 @@
   function syncState(){
     state.scope=els.plotScope.value;state.search=els.plotSearch.value;state.agent=els.agentFilter.value;state.phase=els.phaseFilter.value;state.status=els.statusFilter.value;state.pricing=els.pricingFilter.value;
     state.fields=new Set(Array.prototype.slice.call(document.querySelectorAll('#labelFields input:checked')).map(function(i){return i.value;}));
-    state.avoidOverlap=els.avoidOverlap.checked;state.showLeaderLines=els.showLeaderLines.checked;state.showDots=els.showDots.checked;state.showLegend=els.showLegend.checked;
+    state.avoidOverlap=els.avoidOverlap.checked;state.showLeaderLines=true;state.showDots=els.showDots.checked;state.showLegend=els.showLegend.checked;state.showWatermark=els.showWatermark.checked;
     state.title=els.documentTitle.value;state.subtitle=els.documentSubtitle.value;
   }
 
   function setMode(mode,resetDraw){
     if(mode==='selected' && !selectedIds.size){mode=context.bounds?'current':'full';}
+    if(mode==='filtered' && !filteredIds.size){mode=context.bounds?'current':'full';}
     if(mode==='current' && !context.bounds){mode='full';}
     if(mode==='draw' && resetDraw) state.drawCrop=null;
     state.mode=mode;
@@ -383,6 +450,7 @@
     var help={
       full:'Shows the complete Jebel Ali Hills master plan.',
       current:'Uses the same area and zoom that were open in the Agent/Admin map.',
+      filtered:'Uses the plots already shown by your Agent/Admin filters and frames them automatically.',
       selected:'Shows only the plots you selected and frames them automatically.',
       draw:'Drag a rectangle on the preview to choose any area.'
     };
@@ -398,6 +466,46 @@
     els.previewCanvas.style.width=w+'px';els.canvasWrap.style.width=w+'px';els.canvasWrap.style.height=h+'px';
   }
 
+  function setZoomAround(nextZoom,clientX,clientY){
+    var oldZoom=Number(els.previewZoom.value);
+    nextZoom=clamp(nextZoom,35,180);
+    if(nextZoom===oldZoom) return;
+    var r=els.previewScroller.getBoundingClientRect();
+    var localX=clientX-r.left,localY=clientY-r.top;
+    var contentX=els.previewScroller.scrollLeft+localX;
+    var contentY=els.previewScroller.scrollTop+localY;
+    els.previewZoom.value=nextZoom;applyPreviewZoom();
+    var ratio=nextZoom/oldZoom;
+    els.previewScroller.scrollLeft=contentX*ratio-localX;
+    els.previewScroller.scrollTop=contentY*ratio-localY;
+  }
+
+  function wheelZoom(e){
+    if(e.ctrlKey || e.metaKey || Math.abs(e.deltaY)>=Math.abs(e.deltaX)){
+      e.preventDefault();
+      setZoomAround(Number(els.previewZoom.value)+(e.deltaY<0?10:-10),e.clientX,e.clientY);
+    }
+  }
+
+  function startPan(e){
+    if(state.mode==='draw' || e.button!==0) return;
+    panStart={x:e.clientX,y:e.clientY,left:els.previewScroller.scrollLeft,top:els.previewScroller.scrollTop,id:e.pointerId};
+    els.previewScroller.classList.add('dragging');
+    els.previewScroller.setPointerCapture&&els.previewScroller.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+
+  function movePan(e){
+    if(!panStart || (panStart.id!=null && e.pointerId!==panStart.id)) return;
+    els.previewScroller.scrollLeft=panStart.left-(e.clientX-panStart.x);
+    els.previewScroller.scrollTop=panStart.top-(e.clientY-panStart.y);
+  }
+
+  function finishPan(e){
+    if(!panStart || (e.pointerId!=null && panStart.id!=null && e.pointerId!==panStart.id)) return;
+    panStart=null;els.previewScroller.classList.remove('dragging');
+  }
+
   function fitPreview(){
     var available=Math.max(280,els.previewScroller.clientWidth-46);
     els.previewZoom.value=clamp(Math.floor(available/PREVIEW_W*100),35,180);applyPreviewZoom();
@@ -406,9 +514,9 @@
   function bind(){
     els.previewCanvas=$('previewCanvas');els.canvasWrap=$('canvasWrap');els.previewScroller=$('previewScroller');els.previewMeta=$('previewMeta');els.modeHelp=$('modeHelp');
     els.plotScope=$('plotScope');els.plotSearch=$('plotSearch');els.agentFilter=$('agentFilter');els.phaseFilter=$('phaseFilter');els.statusFilter=$('statusFilter');els.pricingFilter=$('pricingFilter');els.plotSummary=$('plotSummary');
-    els.avoidOverlap=$('avoidOverlap');els.showLeaderLines=$('showLeaderLines');els.showDots=$('showDots');els.showLegend=$('showLegend');els.documentTitle=$('documentTitle');els.documentSubtitle=$('documentSubtitle');els.previewZoom=$('previewZoom');els.drawInstruction=$('drawInstruction');els.exportStatus=$('exportStatus');
+    els.avoidOverlap=$('avoidOverlap');els.showLeaderLines=$('showLeaderLines');els.showDots=$('showDots');els.showLegend=$('showLegend');els.showWatermark=$('showWatermark');els.includeExcel=$('includeExcel');els.documentTitle=$('documentTitle');els.documentSubtitle=$('documentSubtitle');els.previewZoom=$('previewZoom');els.drawInstruction=$('drawInstruction');els.exportStatus=$('exportStatus');
     Array.prototype.slice.call(document.querySelectorAll('#captureModes button')).forEach(function(btn){btn.addEventListener('click',function(){setMode(btn.dataset.mode,true);});});
-    ['plotScope','plotSearch','agentFilter','phaseFilter','statusFilter','pricingFilter','avoidOverlap','showLeaderLines','showDots','showLegend','documentTitle','documentSubtitle'].forEach(function(id){$(id).addEventListener(id==='plotSearch'||id==='documentTitle'||id==='documentSubtitle'?'input':'change',schedulePreview);});
+    ['plotScope','plotSearch','agentFilter','phaseFilter','statusFilter','pricingFilter','avoidOverlap','showDots','showLegend','showWatermark','documentTitle','documentSubtitle'].forEach(function(id){$(id).addEventListener(id==='plotSearch'||id==='documentTitle'||id==='documentSubtitle'?'input':'change',schedulePreview);});
     Array.prototype.slice.call(document.querySelectorAll('#labelFields input')).forEach(function(input){input.addEventListener('change',schedulePreview);});
     $('refreshPreview').addEventListener('click',renderPreview);
     els.previewZoom.addEventListener('input',applyPreviewZoom);
@@ -417,6 +525,12 @@
     $('fitPreview').addEventListener('click',fitPreview);
     $('downloadPng').addEventListener('click',function(){exportFile('png');});
     $('downloadPdf').addEventListener('click',function(){exportFile('pdf');});
+    $('downloadExcel').addEventListener('click',exportExcel);
+    els.previewScroller.addEventListener('wheel',wheelZoom,{passive:false});
+    els.previewScroller.addEventListener('pointerdown',startPan);
+    window.addEventListener('pointermove',movePan);
+    window.addEventListener('pointerup',finishPan);
+    window.addEventListener('pointercancel',finishPan);
     els.previewCanvas.addEventListener('pointerdown',startDraw);
     window.addEventListener('pointermove',moveDraw);
     window.addEventListener('pointerup',finishDraw);
@@ -457,6 +571,88 @@
 
   function cancelDraw(){drawStart=null;if(drawBox)drawBox.hidden=true;if(state.mode==='draw'&&!state.drawCrop)setMode('full');}
 
+  function numberOrBlank(value){var n=Number(value);return isFinite(n)&&value!==null&&value!==''?n:'';}
+
+  function excelRows(){
+    return visiblePoints().map(function(p){
+      return {
+        'GIS Plot':clean(p.gisPlot),
+        'Master Plan':clean(p.masterPlot),
+        'Status':statusFor(p.color).name,
+        'Status Color':clean(p.color),
+        'Type':clean(p.type),
+        'Phase':clean(p.phase),
+        'Size (sqft)':numberOrBlank(p.size),
+        'Price 1 (AED/sqft)':numberOrBlank(p.price),
+        'Total Price 1 (AED)':numberOrBlank(p.total || (p.size&&p.price?Number(p.size)*Number(p.price):'')),
+        'Deposit Cheque 1 - 10% (AED)':numberOrBlank(p.deposit || (p.total?Number(p.total)*.1:'')),
+        'Commission 1 - 2% (AED)':numberOrBlank(p.commission || (p.total?Number(p.total)*.02:'')),
+        'Agent 1':clean(p.agent),
+        'Mobile 1':clean(p.mobile),
+        'Price 2 (AED/sqft)':numberOrBlank(p.secondPrice),
+        'Total Price 2 (AED)':numberOrBlank(p.secondTotal || (p.size&&p.secondPrice?Number(p.size)*Number(p.secondPrice):'')),
+        'Deposit Cheque 2 - 10% (AED)':numberOrBlank(p.secondDeposit || (p.secondTotal?Number(p.secondTotal)*.1:'')),
+        'Commission 2 - 2% (AED)':numberOrBlank(p.secondCommission || (p.secondTotal?Number(p.secondTotal)*.02:'')),
+        'Agent 2':clean(p.secondAgent),
+        'Mobile 2':clean(p.secondMobile),
+        'GFA':clean(p.gfa),
+        'GFA %':numberOrBlank(p.gfaPct),
+        'GFA Allowed (sqft)':numberOrBlank(p.gfaAllowed),
+        'Features':clean(p.features),
+        'Comment':clean(p.comment),
+        'Coordinates':clean(p.coords),
+        'Google Maps':clean(p.mapsUrl),
+        'Last Updated':clean(p.lastUpdated || p.lastDateUpdated)
+      };
+    });
+  }
+
+  function styleWorksheet(ws,rows){
+    if(!ws || !ws['!ref']) return;
+    var range=window.XLSX.utils.decode_range(ws['!ref']);
+    for(var c=range.s.c;c<=range.e.c;c++){
+      var cell=ws[window.XLSX.utils.encode_cell({r:0,c:c})];
+      if(cell) cell.s={font:{bold:true,color:{rgb:'EAD8AC'}},fill:{fgColor:{rgb:'062F28'}},alignment:{horizontal:'center',vertical:'center'}};
+    }
+    ws['!rows']=[{hpt:24}];
+    ws['!autofilter']={ref:ws['!ref']};
+    var keys=rows.length?Object.keys(rows[0]):[];
+    ws['!cols']=keys.map(function(key){
+      var longest=Math.max(key.length,Math.min(42,rows.reduce(function(n,row){return Math.max(n,String(row[key] == null?'':row[key]).length);},0)));
+      return {wch:clamp(longest+2,12,42)};
+    });
+  }
+
+  function exportExcel(){
+    syncState();
+    var XLSX=window.XLSX;
+    if(!XLSX){els.exportStatus.textContent='Excel library did not load. Please refresh and try again.';return false;}
+    var rows=excelRows();
+    if(!rows.length){els.exportStatus.textContent='No plots are currently included for Excel export.';return false;}
+    var totals=rows.reduce(function(a,row){
+      a.area+=Number(row['Size (sqft)'])||0;a.value1+=Number(row['Total Price 1 (AED)'])||0;a.deposit1+=Number(row['Deposit Cheque 1 - 10% (AED)'])||0;a.value2+=Number(row['Total Price 2 (AED)'])||0;a.deposit2+=Number(row['Deposit Cheque 2 - 10% (AED)'])||0;return a;
+    },{area:0,value1:0,deposit1:0,value2:0,deposit2:0});
+    var summary=[
+      ['Hayat Luxury Properties — Jebel Ali Hills'],
+      ['Capture title',clean(state.title)],
+      ['Prepared',new Date().toISOString()],
+      ['Plots',rows.length],
+      ['Total area (sqft)',totals.area],
+      ['Total offer 1 value (AED)',totals.value1],
+      ['Total offer 1 deposit cheques (AED)',totals.deposit1],
+      ['Total offer 2 value (AED)',totals.value2],
+      ['Total offer 2 deposit cheques (AED)',totals.deposit2],
+      ['Calculation note','Deposit cheque = 10% of total price; commission = 2% of total price, using stored inventory calculations.']
+    ];
+    var wb=XLSX.utils.book_new();
+    var summaryWs=XLSX.utils.aoa_to_sheet(summary);summaryWs['!cols']=[{wch:38},{wch:72}];
+    var dataWs=XLSX.utils.json_to_sheet(rows);styleWorksheet(dataWs,rows);
+    XLSX.utils.book_append_sheet(wb,summaryWs,'Summary');XLSX.utils.book_append_sheet(wb,dataWs,'Plots');
+    XLSX.writeFile(wb,fileName('xlsx'));
+    els.exportStatus.textContent='Excel ready — '+rows.length+' plot'+(rows.length===1?'':'s')+' with calculations.';
+    return true;
+  }
+
   function exportFile(format){
     syncState();
     var width=Number($('quality').value)||3840;
@@ -468,7 +664,9 @@
         if(format==='png'){
           canvas.toBlob(function(blob){
             if(!blob){finishExport(buttons,'PNG export failed.');return;}
-            downloadBlob(blob,fileName('png'));finishExport(buttons,'PNG ready — '+Math.round(canvas.width)+' × '+Math.round(canvas.height)+' px.');
+            downloadBlob(blob,fileName('png'));
+            var withExcel=els.includeExcel.checked&&exportExcel();
+            finishExport(buttons,'PNG ready — '+Math.round(canvas.width)+' × '+Math.round(canvas.height)+' px'+(withExcel?' · Excel included.':'.'));
           },'image/png');
         } else {
           var jsPDF=window.jspdf&&window.jspdf.jsPDF;
@@ -478,7 +676,9 @@
           var pdf=new jsPDF({orientation:landscape?'landscape':'portrait',unit:'mm',format:'a4',compress:true});
           var ratio=Math.min(pageW/canvas.width,pageH/canvas.height),w=canvas.width*ratio,h=canvas.height*ratio;
           pdf.addImage(canvas.toDataURL('image/jpeg',.94),'JPEG',(pageW-w)/2,(pageH-h)/2,w,h,undefined,'FAST');
-          pdf.save(fileName('pdf'));finishExport(buttons,'PDF ready.');
+          pdf.save(fileName('pdf'));
+          var pdfWithExcel=els.includeExcel.checked&&exportExcel();
+          finishExport(buttons,'PDF ready'+(pdfWithExcel?' · Excel included.':'.'));
         }
       }catch(err){console.error(err);finishExport(buttons,'Export failed: '+err.message);}
     },60);
@@ -494,10 +694,16 @@
     bind();populateFilters();
     els.plotScope.value=state.scope;
     var selectedOption=els.plotScope.querySelector('option[value="selected"]');
+    var filteredOption=els.plotScope.querySelector('option[value="filtered"]');
     var selectedModeButton=document.querySelector('#captureModes button[data-mode="selected"]');
+    var filteredModeButton=document.querySelector('#captureModes button[data-mode="filtered"]');
     if(selectedIds.size) selectedOption.textContent='Selected in Agent/Admin map ('+selectedIds.size+')';
-    if(!selectedIds.size){
+    if(filteredIds.size) filteredOption.textContent='Filtered in Agent/Admin map ('+filteredIds.size+')';
+    if(!selectedIds.size && !filteredIds.size){
       state.title='Jebel Ali Hills — Available Plots';
+      els.documentTitle.value=state.title;
+    } else if(!selectedIds.size && filteredIds.size) {
+      state.title='Jebel Ali Hills — Filtered Plots';
       els.documentTitle.value=state.title;
     }
     if(!selectedIds.size){
@@ -505,7 +711,13 @@
       selectedModeButton.disabled=true;
       selectedModeButton.title='Select plots in the Agent or Admin map, then open Capture Studio again.';
     }
+    if(!filteredIds.size){
+      filteredOption.disabled=true;
+      filteredModeButton.disabled=true;
+      filteredModeButton.title='Apply filters in the Agent or Admin map, then open Capture Studio again.';
+    }
     if(state.mode==='selected'&&!selectedIds.size) state.mode=context.bounds?'current':'full';
+    if(state.mode==='filtered'&&!filteredIds.size) state.mode=context.bounds?'current':'full';
     if(state.mode==='current'&&!context.bounds) state.mode='full';
     image.onload=function(){ready=true;setMode(state.mode);setTimeout(fitPreview,100);};
     image.onerror=function(){els.exportStatus.textContent='The master plan image could not be loaded.';};
