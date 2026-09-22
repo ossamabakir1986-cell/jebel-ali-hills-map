@@ -330,8 +330,14 @@
     } catch(e) {}
     return ids;
   };
+  window.HAYAT_GET_FILTERED_IDS = function(){
+    var ids=[];
+    function add(value){var id=String(value == null?'':value).trim();if(id&&ids.indexOf(id)===-1)ids.push(id);}
+    try {(window.currentList || window.baseFilteredList || []).forEach(function(p){add(p&&p.gisPlot);});} catch(e) {}
+    return ids;
+  };
   var script = document.createElement('script');
-  script.src = 'js/capture_link.js?v=20260922-3';
+  script.src = 'js/capture_link.js?v=20260922-4';
   script.defer = true;
   document.head.appendChild(script);
 })();
