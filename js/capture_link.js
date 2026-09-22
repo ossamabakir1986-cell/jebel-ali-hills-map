@@ -34,6 +34,21 @@
     return ids;
   }
 
+  function listFilteredIds(){
+    var ids=[];
+    function add(value){var id=String(value == null?'':value).trim();if(id&&ids.indexOf(id)===-1)ids.push(id);}
+    function addPoints(list){(list||[]).forEach(function(p){add(p&&(p.gisPlot||p.gis||p.id));});}
+    try {if(typeof window.HAYAT_GET_FILTERED_IDS==='function') window.HAYAT_GET_FILTERED_IDS().forEach(add);} catch(e) {}
+    try {if(!ids.length) addPoints(window.currentList);} catch(e) {}
+    return ids;
+  }
+
+  function allInventoryCount(){
+    try {
+      var ids=[];(window.points||[]).forEach(function(p){var id=String(p&&p.gisPlot||'').trim();if(id&&ids.indexOf(id)===-1)ids.push(id);});return ids.length;
+    } catch(e) {return 0;}
+  }
+
   function currentBounds(){
     try {
       if(!window.map || typeof window.map.getBounds !== 'function') return null;
@@ -47,11 +62,14 @@
 
   function openCaptureStudio(){
     var selected = listSelectedIds();
+    var filtered = listFilteredIds();
+    var filteredActive = filtered.length>0 && (!allInventoryCount() || filtered.length<allInventoryCount());
     var bounds = currentBounds();
     var context = {
       version:1,
       source:location.pathname.indexOf('admin') !== -1 ? 'admin' : 'agent',
       selected:selected,
+      filtered:filteredActive?filtered:[],
       bounds:bounds,
       createdAt:new Date().toISOString()
     };
@@ -60,9 +78,10 @@
     try {
       localStorage.setItem('JAH_CAPTURE_HANDOFF_V1', JSON.stringify({token:handoff,context:context}));
     } catch(e) {}
-    var mode = selected.length ? 'selected' : 'current';
-    var url='capture.html?v=20260922-3&mode='+mode+'&handoff='+encodeURIComponent(handoff);
+    var mode = selected.length ? 'selected' : (filteredActive ? 'filtered' : 'current');
+    var url='capture.html?v=20260922-4&mode='+mode+'&handoff='+encodeURIComponent(handoff);
     if(selected.length && selected.length<=120) url+='&plots='+encodeURIComponent(selected.join(','));
+    if(!selected.length && filteredActive && filtered.length<=120) url+='&filtered='+encodeURIComponent(filtered.join(','));
     if(bounds) url+='&bounds='+encodeURIComponent([bounds.north,bounds.south,bounds.east,bounds.west].join(','));
     window.open(url, '_blank', 'noopener');
   }
