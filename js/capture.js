@@ -638,32 +638,51 @@
 
   function numberOrBlank(value){var n=Number(value);return isFinite(n)&&value!==null&&value!==''?n:'';}
 
+  function offerNumbers(p,priceKey,totalKey,depositKey,commissionKey){
+    var price=numberOrBlank(p[priceKey]);
+    var size=numberOrBlank(p.size);
+    var storedTotal=numberOrBlank(p[totalKey]);
+    var total=storedTotal!=='' ? storedTotal : (size!==''&&price!=='' ? size*price : '');
+    var storedDeposit=numberOrBlank(p[depositKey]);
+    var storedCommission=numberOrBlank(p[commissionKey]);
+    return {
+      price:price,
+      total:total,
+      deposit:storedDeposit!=='' ? storedDeposit : (total!=='' ? total*.1 : ''),
+      commission:storedCommission!=='' ? storedCommission : (total!=='' ? total*.02 : '')
+    };
+  }
+
   function excelRows(){
-    return visiblePoints().map(function(p){
+    return visiblePoints().slice().sort(function(a,b){
+      return clean(a.masterPlot).localeCompare(clean(b.masterPlot),undefined,{numeric:true,sensitivity:'base'});
+    }).map(function(p){
+      var offer1=offerNumbers(p,'price','total','deposit','commission');
+      var offer2=offerNumbers(p,'secondPrice','secondTotal','secondDeposit','secondCommission');
       return {
-        'GIS Plot':clean(p.gisPlot),
-        'Master Plan':clean(p.masterPlot),
+        'Plot Number':clean(p.masterPlot),
+        'GIS Plot Number':clean(p.gisPlot),
+        'Size (sqft)':numberOrBlank(p.size),
+        'Price 1 (AED/sqft)':offer1.price,
+        'Total Price 1 (AED)':offer1.total,
+        'Deposit Cheque 1 - 10% (AED)':offer1.deposit,
+        'Commission 1 - 2% (AED)':offer1.commission,
+        'GFA':clean(p.gfa),
+        'GFA (%)':numberOrBlank(p.gfaPct),
+        'GFA Allowed (sqft)':numberOrBlank(p.gfaAllowed),
         'Status':statusFor(p.color).name,
         'Status Color':clean(p.color),
         'Type':clean(p.type),
         'Phase':clean(p.phase),
-        'Size (sqft)':numberOrBlank(p.size),
-        'Price 1 (AED/sqft)':numberOrBlank(p.price),
-        'Total Price 1 (AED)':numberOrBlank(p.total || (p.size&&p.price?Number(p.size)*Number(p.price):'')),
-        'Deposit Cheque 1 - 10% (AED)':numberOrBlank(p.deposit || (p.total?Number(p.total)*.1:'')),
-        'Commission 1 - 2% (AED)':numberOrBlank(p.commission || (p.total?Number(p.total)*.02:'')),
+        'Features':clean(p.features),
         'Agent 1':clean(p.agent),
         'Mobile 1':clean(p.mobile),
-        'Price 2 (AED/sqft)':numberOrBlank(p.secondPrice),
-        'Total Price 2 (AED)':numberOrBlank(p.secondTotal || (p.size&&p.secondPrice?Number(p.size)*Number(p.secondPrice):'')),
-        'Deposit Cheque 2 - 10% (AED)':numberOrBlank(p.secondDeposit || (p.secondTotal?Number(p.secondTotal)*.1:'')),
-        'Commission 2 - 2% (AED)':numberOrBlank(p.secondCommission || (p.secondTotal?Number(p.secondTotal)*.02:'')),
+        'Price 2 (AED/sqft)':offer2.price,
+        'Total Price 2 (AED)':offer2.total,
+        'Deposit Cheque 2 - 10% (AED)':offer2.deposit,
+        'Commission 2 - 2% (AED)':offer2.commission,
         'Agent 2':clean(p.secondAgent),
         'Mobile 2':clean(p.secondMobile),
-        'GFA':clean(p.gfa),
-        'GFA %':numberOrBlank(p.gfaPct),
-        'GFA Allowed (sqft)':numberOrBlank(p.gfaAllowed),
-        'Features':clean(p.features),
         'Comment':clean(p.comment),
         'Coordinates':clean(p.coords),
         'Google Maps':clean(p.mapsUrl),
@@ -672,20 +691,87 @@
     });
   }
 
+  function setCellStyle(cell,style){
+    if(!cell) return;
+    cell.s=Object.assign({},cell.s||{},style||{});
+  }
+
   function styleWorksheet(ws,rows){
     if(!ws || !ws['!ref']) return;
     var range=window.XLSX.utils.decode_range(ws['!ref']);
+    var keys=rows.length?Object.keys(rows[0]):[];
+    var moneyColumns=new Set(['Price 1 (AED/sqft)','Total Price 1 (AED)','Deposit Cheque 1 - 10% (AED)','Commission 1 - 2% (AED)','Price 2 (AED/sqft)','Total Price 2 (AED)','Deposit Cheque 2 - 10% (AED)','Commission 2 - 2% (AED)']);
+    var areaColumns=new Set(['Size (sqft)','GFA Allowed (sqft)']);
+    var offer1Columns=new Set(['Price 1 (AED/sqft)','Total Price 1 (AED)','Deposit Cheque 1 - 10% (AED)','Commission 1 - 2% (AED)']);
+    var offer2Columns=new Set(['Price 2 (AED/sqft)','Total Price 2 (AED)','Deposit Cheque 2 - 10% (AED)','Commission 2 - 2% (AED)']);
+    var gfaColumns=new Set(['GFA','GFA (%)','GFA Allowed (sqft)']);
     for(var c=range.s.c;c<=range.e.c;c++){
       var cell=ws[window.XLSX.utils.encode_cell({r:0,c:c})];
-      if(cell) cell.s={font:{bold:true,color:{rgb:'EAD8AC'}},fill:{fgColor:{rgb:'062F28'}},alignment:{horizontal:'center',vertical:'center'}};
+      if(cell) cell.s={font:{name:'Arial',sz:10,bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'062F28'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{bottom:{style:'medium',color:{rgb:'CDA85B'}},right:{style:'thin',color:{rgb:'6F8B83'}}}};
     }
-    ws['!rows']=[{hpt:24}];
+    for(var r=1;r<=range.e.r;r++){
+      var row=rows[r-1]||{};
+      for(var col=range.s.c;col<=range.e.c;col++){
+        var key=keys[col]||'';
+        var addr=window.XLSX.utils.encode_cell({r:r,c:col});
+        var dataCell=ws[addr];
+        if(!dataCell) continue;
+        var fill=r%2 ? 'FFFDF8' : 'F3F7F5';
+        if(offer1Columns.has(key)) fill='E7F2EE';
+        else if(offer2Columns.has(key)) fill='EAF2FA';
+        else if(gfaColumns.has(key)) fill='FBF2DE';
+        setCellStyle(dataCell,{font:{name:'Arial',sz:10,color:{rgb:'17342E'}},fill:{patternType:'solid',fgColor:{rgb:fill}},alignment:{vertical:'center',horizontal:typeof dataCell.v==='number'?'right':'left'},border:{bottom:{style:'hair',color:{rgb:'D9E1DE'}}}});
+        if(moneyColumns.has(key)) dataCell.z=key.indexOf('Price ')===0 ? '"AED" #,##0.00' : '"AED" #,##0';
+        if(areaColumns.has(key)) dataCell.z='#,##0.00';
+        if(key==='GFA (%)') dataCell.z='0.0';
+        if(key==='Google Maps' && row[key]){
+          dataCell.l={Target:String(row[key]),Tooltip:'Open plot in Google Maps'};
+          dataCell.s.font={name:'Arial',sz:10,color:{rgb:'0563C1'},underline:true};
+        }
+      }
+      var statusIndex=keys.indexOf('Status');
+      if(statusIndex!==-1){
+        var statusCell=ws[window.XLSX.utils.encode_cell({r:r,c:statusIndex})];
+        var status=clean(row.Status);
+        var statusFill=status==='Direct'?'FADBD8':status==='On hold'?'FCE4EC':status==='Through broker'?'DDEBF7':'E7E6E6';
+        var statusFont=status==='Direct'?'9C0006':status==='On hold'?'9C0055':status==='Through broker'?'1F4E78':'404040';
+        setCellStyle(statusCell,{font:{name:'Arial',sz:10,bold:true,color:{rgb:statusFont}},fill:{patternType:'solid',fgColor:{rgb:statusFill}},alignment:{horizontal:'center',vertical:'center'}});
+      }
+    }
+    ws['!rows']=[{hpt:34}].concat(rows.map(function(){return {hpt:22};}));
     ws['!autofilter']={ref:ws['!ref']};
-    var keys=rows.length?Object.keys(rows[0]):[];
+    ws['!freeze']={xSplit:2,ySplit:1,topLeftCell:'C2',activePane:'bottomRight',state:'frozen'};
     ws['!cols']=keys.map(function(key){
       var longest=Math.max(key.length,Math.min(42,rows.reduce(function(n,row){return Math.max(n,String(row[key] == null?'':row[key]).length);},0)));
-      return {wch:clamp(longest+2,12,42)};
+      var minWidth=key==='Plot Number'||key==='GIS Plot Number'?16:(key==='Features'||key==='Comment'?24:12);
+      return {wch:clamp(longest+2,minWidth,42)};
     });
+  }
+
+  function styleSummaryWorksheet(ws,summary){
+    if(!ws || !ws['!ref']) return;
+    ws['!cols']=[{wch:42},{wch:76}];
+    ws['!rows']=summary.map(function(_,i){return {hpt:i===0?30:(i===summary.length-1?34:22)};});
+    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:1}}];
+    for(var r=0;r<summary.length;r++){
+      for(var c=0;c<2;c++){
+        var cell=ws[window.XLSX.utils.encode_cell({r:r,c:c})];
+        if(!cell) continue;
+        if(r===0){
+          cell.s={font:{name:'Arial',sz:15,bold:true,color:{rgb:'EAD8AC'}},fill:{patternType:'solid',fgColor:{rgb:'062F28'}},alignment:{horizontal:'left',vertical:'center'}};
+        }else if(c===0){
+          cell.s={font:{name:'Arial',sz:10,bold:true,color:{rgb:'17342E'}},fill:{patternType:'solid',fgColor:{rgb:r%2?'E8F0ED':'F5EEDC'}},alignment:{vertical:'center'},border:{bottom:{style:'thin',color:{rgb:'D9E1DE'}}}};
+        }else{
+          var summaryLabel=clean(summary[r]&&summary[r][0]);
+          cell.s={font:{name:'Arial',sz:10,color:{rgb:'17342E'}},fill:{patternType:'solid',fgColor:{rgb:r%2?'F7FAF9':'FFFDF8'}},alignment:{vertical:'center',wrapText:r===summary.length-1},border:{bottom:{style:'thin',color:{rgb:'D9E1DE'}}}};
+          if(typeof cell.v==='number'){
+            if(summaryLabel==='Plots') cell.z='#,##0';
+            else if(summaryLabel.indexOf('area')!==-1) cell.z='#,##0.00';
+            else if(summaryLabel.indexOf('(AED)')!==-1) cell.z='"AED" #,##0';
+          }
+        }
+      }
+    }
   }
 
   function exportExcel(){
@@ -695,22 +781,25 @@
     var rows=excelRows();
     if(!rows.length){els.exportStatus.textContent='No plots are currently included for Excel export.';return false;}
     var totals=rows.reduce(function(a,row){
-      a.area+=Number(row['Size (sqft)'])||0;a.value1+=Number(row['Total Price 1 (AED)'])||0;a.deposit1+=Number(row['Deposit Cheque 1 - 10% (AED)'])||0;a.value2+=Number(row['Total Price 2 (AED)'])||0;a.deposit2+=Number(row['Deposit Cheque 2 - 10% (AED)'])||0;return a;
-    },{area:0,value1:0,deposit1:0,value2:0,deposit2:0});
+      a.area+=Number(row['Size (sqft)'])||0;a.value1+=Number(row['Total Price 1 (AED)'])||0;a.deposit1+=Number(row['Deposit Cheque 1 - 10% (AED)'])||0;a.commission1+=Number(row['Commission 1 - 2% (AED)'])||0;a.value2+=Number(row['Total Price 2 (AED)'])||0;a.deposit2+=Number(row['Deposit Cheque 2 - 10% (AED)'])||0;a.commission2+=Number(row['Commission 2 - 2% (AED)'])||0;return a;
+    },{area:0,value1:0,deposit1:0,commission1:0,value2:0,deposit2:0,commission2:0});
     var summary=[
       ['Hayat Luxury Properties — Jebel Ali Hills'],
       ['Capture title',clean(state.title)],
+      ['Capture subtitle',clean(state.subtitle)],
       ['Prepared',new Date().toISOString()],
       ['Plots',rows.length],
       ['Total area (sqft)',totals.area],
       ['Total offer 1 value (AED)',totals.value1],
       ['Total offer 1 deposit cheques (AED)',totals.deposit1],
+      ['Total offer 1 commission (AED)',totals.commission1],
       ['Total offer 2 value (AED)',totals.value2],
       ['Total offer 2 deposit cheques (AED)',totals.deposit2],
+      ['Total offer 2 commission (AED)',totals.commission2],
       ['Calculation note','Deposit cheque = 10% of total price; commission = 2% of total price, using stored inventory calculations.']
     ];
     var wb=XLSX.utils.book_new();
-    var summaryWs=XLSX.utils.aoa_to_sheet(summary);summaryWs['!cols']=[{wch:38},{wch:72}];
+    var summaryWs=XLSX.utils.aoa_to_sheet(summary);styleSummaryWorksheet(summaryWs,summary);
     var dataWs=XLSX.utils.json_to_sheet(rows);styleWorksheet(dataWs,rows);
     XLSX.utils.book_append_sheet(wb,summaryWs,'Summary');XLSX.utils.book_append_sheet(wb,dataWs,'Plots');
     XLSX.writeFile(wb,fileName('xlsx'));
